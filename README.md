@@ -20,3 +20,4 @@ npm run dev
 - `src/constants`: application constants
 - `src/contexts`: React context providers
 - `src/routes`: route configuration
+# VitalWebsite
