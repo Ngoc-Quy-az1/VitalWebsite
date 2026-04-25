@@ -1,47 +1,202 @@
-:root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-  color: #1f2937;
-  background-color: #f3f4f6;
+@import "tailwindcss";
+
+@layer base {
+  body {
+    margin: 0;
+    font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+      sans-serif;
+    font-size: 17px;
+    line-height: 1.5;
+    background: radial-gradient(
+      circle at top left,
+      rgba(153, 246, 228, 0.45),
+      rgba(239, 246, 255, 0.85) 35%,
+      #f8fafc 70%
+    );
+    color: #0f172a;
+  }
 }
 
-* {
-  box-sizing: border-box;
+@keyframes pulseRing {
+  0% {
+    transform: scale(0.94);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.1);
+    opacity: 0;
+  }
 }
 
-body {
-  margin: 0;
+@keyframes waveBar {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
 }
 
-.app-shell {
-  min-height: 100vh;
+.listening-ring {
+  animation: pulseRing 1.4s ease-out infinite;
 }
 
-.app-header {
-  background: #111827;
-  color: #f9fafb;
-  padding: 1rem 1.5rem;
+.wave-bar {
+  animation: waveBar 0.9s ease-in-out infinite;
+  transform-origin: center bottom;
 }
 
-.app-header h1 {
-  margin: 0;
+.thinking-dot {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 9999px;
+  background: #0d9488;
+  opacity: 0.35;
+  animation: thinkingPulse 1.2s ease-in-out infinite;
 }
 
-.app-header p {
-  margin: 0.25rem 0 0;
-  color: #d1d5db;
+.thinking-dot:nth-child(2) {
+  animation-delay: 0.12s;
 }
 
-.app-main {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 1.5rem;
+.thinking-dot:nth-child(3) {
+  animation-delay: 0.24s;
 }
 
-.card {
-  background: #ffffff;
-  border-radius: 12px;
-  padding: 1.25rem;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+@keyframes thinkingPulse {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+.avatar-shell {
+  position: relative;
+  width: 300px;
+  height: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatar-halo {
+  position: absolute;
+  inset: 30px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(34, 211, 238, 0.2), rgba(6, 182, 212, 0.03));
+  animation: avatarBreath 3.2s ease-in-out infinite;
+}
+
+.avatar-head {
+  position: relative;
+  width: 170px;
+  height: 170px;
+  border-radius: 9999px;
+  background: linear-gradient(180deg, #ecfeff 0%, #dbeafe 100%);
+  box-shadow: 0 20px 40px rgba(20, 184, 166, 0.16);
+  border: 1px solid rgba(45, 212, 191, 0.35);
+}
+
+.avatar-hair {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 44px;
+  border-radius: 9999px 9999px 40px 40px;
+  background: linear-gradient(180deg, #0f766e 0%, #115e59 100%);
+  opacity: 0.9;
+}
+
+.avatar-eye {
+  position: absolute;
+  top: 74px;
+  width: 22px;
+  height: 8px;
+  border-radius: 9999px;
+  background: #475569;
+}
+
+.avatar-eye-left {
+  left: 50px;
+}
+
+.avatar-eye-right {
+  right: 50px;
+}
+
+.avatar-mouth {
+  position: absolute;
+  left: 50%;
+  top: 112px;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 8px;
+  border-radius: 9999px;
+  background: #0f766e;
+  transition: all 0.25s ease;
+}
+
+.avatar-mouth-open {
+  width: 30px;
+  height: 14px;
+  border-radius: 0 0 9999px 9999px;
+  background: #0d9488;
+}
+
+.avatar-body {
+  margin-top: -8px;
+  width: 120px;
+  height: 72px;
+  border-radius: 60px 60px 20px 20px;
+  background: linear-gradient(180deg, #14b8a6 0%, #0f766e 100%);
+  box-shadow: 0 14px 28px rgba(15, 118, 110, 0.22);
+}
+
+.avatar-speaking .avatar-halo {
+  animation-duration: 1.8s;
+}
+
+@keyframes avatarBreath {
+  0%,
+  100% {
+    transform: scale(0.98);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scale(1.03);
+    opacity: 0.9;
+  }
+}
+
+.markdown-content .katex,
+.markdown-content .katex-display {
+  color: inherit;
+}
+
+.markdown-content .katex {
+  font-size: 1.08em;
+}
+
+.markdown-content .katex-display {
+  margin: 0.9rem 0;
+  padding: 0.7rem 0.9rem;
+  border-radius: 0.75rem;
+  background: rgba(15, 23, 42, 0.04);
+  text-align: center;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.markdown-content .katex-display > .katex {
+  font-size: 1.2em;
+  line-height: 1.35;
 }
