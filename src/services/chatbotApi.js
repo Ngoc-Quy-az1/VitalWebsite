@@ -94,3 +94,64 @@ export async function prepareTtsText({ text }) {
   return response.json();
 }
 
+export async function analyzeHealthReportImage({ file, language = "vi", patientId = null }) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("language", language);
+  if (patientId) {
+    formData.append("patient_id", patientId);
+  }
+
+  const response = await fetch(resolveUrl("/health-report/analyze-image"), {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    let detail = `HTTP ${response.status}`;
+    try {
+      const data = await response.json();
+      detail = data?.detail || detail;
+    } catch {
+      // fallback
+    }
+    throw new Error(detail);
+  }
+
+  return response.json();
+}
+
+export async function analyzeAndAnswerHealthReportImage({
+  file,
+  question = "Phân tích ảnh đã tải lên",
+  language = "vi",
+  patientId = null,
+  topK = 5,
+}) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("question", question);
+  formData.append("language", language);
+  formData.append("top_k", String(topK));
+  if (patientId) {
+    formData.append("patient_id", patientId);
+  }
+
+  const response = await fetch(resolveUrl("/health-report/analyze-and-answer"), {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    let detail = `HTTP ${response.status}`;
+    try {
+      const data = await response.json();
+      detail = data?.detail || detail;
+    } catch {
+      // fallback
+    }
+    throw new Error(detail);
+  }
+  return response.json();
+}
+

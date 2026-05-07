@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import VirtualAvatarPanel from "../components/avatar/VirtualAvatarPanel";
 import ChatWindow from "../components/chat/ChatWindow";
 import BottomInputArea from "../components/input/BottomInputArea";
-import { askChatbot, prepareTtsText } from "../services/chatbotApi";
+import { askChatbot, analyzeAndAnswerHealthReportImage, prepareTtsText } from "../services/chatbotApi";
 
 function pickBestVietnameseVoice(voices) {
   if (!Array.isArray(voices) || voices.length === 0) return null;
@@ -183,6 +183,7 @@ export default function HomePage() {
     const draftText = String(overrideText ?? inputValue ?? "").trim();
     if (!draftText && !pendingImage) return;
     if (sendLockRef.current) return;
+    const pendingImageForMessage = pendingImage;
 
     const now = Date.now();
     const lastText = lastSentRef.current.text;
@@ -201,8 +202,11 @@ export default function HomePage() {
       id: `u-${Date.now()}`,
       role: "user",
       content: userText || "(uploaded image)",
-      imagePreview: pendingImage?.preview,
+      imagePreview: pendingImageForMessage?.preview,
     });
+    // Clear composer image immediately after submitting.
+    // Keep preview on the sent message bubble via pendingImageForMessage.
+    setPendingImage(null);
 
     setApiError("");
     setInputValue("");
@@ -210,11 +214,22 @@ export default function HomePage() {
     setIsThinking(true);
 
     try {
-      const result = await askChatbot({
-        query: userText || "Phân tích ảnh đã tải lên",
-        topK: 5,
-        includeDebug: false,
-      });
+      let result;
+      if (pendingImageForMessage?.file) {
+        result = await analyzeAndAnswerHealthReportImage({
+          file: pendingImageForMessage.file,
+          question: userText || "Phân tích ảnh đã tải lên",
+          language: "vi",
+          patientId: null,
+          topK: 5,
+        });
+      } else {
+        result = await askChatbot({
+          query: userText || "Phân tích ảnh đã tải lên",
+          topK: 5,
+          includeDebug: false,
+        });
+      }
 
       addMessage({
         id: `a-${Date.now()}`,
@@ -258,7 +273,6 @@ export default function HomePage() {
       setIsSpeaking(false);
     } finally {
       setIsThinking(false);
-      handleRemoveImage();
       sendLockRef.current = false;
     }
   };

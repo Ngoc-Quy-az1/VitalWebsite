@@ -1,5 +1,6 @@
 import ReactMarkdown from "react-markdown";
 import rehypeKatex from "rehype-katex";
+import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 
 function normalizeMathDelimiters(raw) {
@@ -83,7 +84,7 @@ export default function MessageBubble({ message }) {
         </p>
         <div className="space-y-3 leading-7 markdown-content">
           <ReactMarkdown
-            remarkPlugins={[remarkMath]}
+            remarkPlugins={[remarkGfm, remarkMath]}
             rehypePlugins={[rehypeKatex]}
             components={{
               p: (props) => <p className="mb-2 leading-7" {...props} />,
@@ -93,6 +94,21 @@ export default function MessageBubble({ message }) {
               ul: (props) => <ul className="mb-2 list-disc space-y-1 pl-6" {...props} />,
               ol: (props) => <ol className="mb-2 list-decimal space-y-1 pl-6" {...props} />,
               li: (props) => <li className="leading-7" {...props} />,
+              table: (props) => (
+                <div className="my-3 overflow-x-auto rounded-xl border border-teal-100">
+                  <table className="min-w-full border-collapse text-sm" {...props} />
+                </div>
+              ),
+              thead: (props) => <thead className="bg-teal-50 text-slate-800" {...props} />,
+              tbody: (props) => <tbody className="bg-white" {...props} />,
+              tr: (props) => <tr className="border-b border-teal-100 last:border-b-0" {...props} />,
+              th: (props) => (
+                <th
+                  className="px-3 py-2 text-left text-xs font-semibold tracking-wide text-teal-700 uppercase"
+                  {...props}
+                />
+              ),
+              td: (props) => <td className="px-3 py-2 align-top leading-6 text-slate-700" {...props} />,
               hr: (props) => <hr className="my-3 border-white/30" {...props} />,
               code: ({ inline, className, children, ...props }) =>
                 inline ? (
