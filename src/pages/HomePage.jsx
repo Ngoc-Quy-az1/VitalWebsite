@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import VirtualAvatarPanel from "../components/avatar/VirtualAvatarPanel";
 import ChatWindow from "../components/chat/ChatWindow";
 import BottomInputArea from "../components/input/BottomInputArea";
@@ -333,6 +334,20 @@ export default function HomePage() {
           </h1>
         </div>
         <div className="flex items-center gap-3">
+          <div className="hidden items-center gap-2 md:flex">
+            <Link
+              to="/login"
+              className="rounded-full border border-teal-200 bg-white px-3 py-1.5 text-sm font-medium text-teal-700 transition hover:bg-teal-50"
+            >
+              Đăng nhập
+            </Link>
+            <Link
+              to="/register"
+              className="rounded-full bg-teal-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-teal-700"
+            >
+              Đăng ký
+            </Link>
+          </div>
           <div className="inline-flex rounded-full border border-teal-200 bg-white p-1">
             <button
               type="button"
