@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import VirtualAvatarPanel from "../components/avatar/VirtualAvatarPanel";
+import ChatHistorySidebar from "../components/chat/ChatHistorySidebar";
 import ChatWindow from "../components/chat/ChatWindow";
 import BottomInputArea from "../components/input/BottomInputArea";
+import { QUICK_REPLIES } from "../constants/quickReplies";
+import { useTheme } from "../hooks/useTheme";
 import { askChatbot, analyzeAndAnswerHealthReportImage, prepareTtsText } from "../services/chatbotApi";
 
 function pickBestVietnameseVoice(voices) {
@@ -38,8 +40,34 @@ const starterMessages = [
   },
 ];
 
+const initialRecentChats = [
+  {
+    id: "chat-1",
+    title: "Năm case lâm sàng mẫu",
+    preview: "Tóm tắt hướng xử lý và dấu hiệu cần theo dõi",
+  },
+  {
+    id: "chat-2",
+    title: "Sửa cấu trúc JSON và thêm trường",
+    preview: "Điều chỉnh dữ liệu đầu vào để chatbot đọc đúng",
+  },
+  {
+    id: "chat-3",
+    title: "Nhận diện mã số trong ảnh xét nghiệm",
+    preview: "Phân tích ảnh tải lên và rút trích thông tin",
+  },
+  {
+    id: "chat-4",
+    title: "Điền dữ liệu thiếu trong file",
+    preview: "Bổ sung trường còn trống từ nguồn hiện có",
+  },
+];
+
 export default function HomePage() {
   const [messages, setMessages] = useState(starterMessages);
+  const [recentChats, setRecentChats] = useState(initialRecentChats);
+  const [activeChatId, setActiveChatId] = useState(initialRecentChats[0].id);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [interactionMode, setInteractionMode] = useState("chat");
   const [pendingImage, setPendingImage] = useState(null);
@@ -47,6 +75,8 @@ export default function HomePage() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [apiError, setApiError] = useState("");
+  const [showMobileAvatar, setShowMobileAvatar] = useState(false);
+  const { isDark, toggleTheme, setIsDark } = useTheme();
   const recognitionRef = useRef(null);
   const silenceTimeoutRef = useRef(null);
   const transcriptBufferRef = useRef("");
@@ -56,6 +86,35 @@ export default function HomePage() {
 
   const addMessage = (message) => {
     setMessages((prev) => [...prev, message]);
+  };
+
+  const handleNewChat = () => {
+    const newChatId = `chat-${Date.now()}`;
+    setMessages(starterMessages);
+    setInputValue("");
+    setPendingImage(null);
+    setApiError("");
+    setActiveChatId(newChatId);
+    setRecentChats((prev) => [
+      {
+        id: newChatId,
+        title: "Cuộc trò chuyện mới",
+        preview: "Bắt đầu một phiên tư vấn mới",
+      },
+      ...prev,
+    ].slice(0, 4));
+  };
+
+  const handleSelectChat = (chatId) => {
+    setActiveChatId(chatId);
+  };
+
+  const handleToggleSidebar = () => {
+    setIsSidebarCollapsed((prev) => !prev);
+  };
+
+  const handleQuickReply = (text) => {
+    setInputValue(text);
   };
 
   const handleToggleListening = () => {
@@ -323,75 +382,30 @@ export default function HomePage() {
   }, [interactionMode]);
 
   return (
-    <section className="mx-auto flex h-screen max-w-[1680px] flex-col p-4 md:p-5">
-      <header className="mb-4 flex items-center justify-between rounded-3xl border border-cyan-100 bg-white/75 px-5 py-4 shadow-sm backdrop-blur md:px-6">
-        <div>
-          <p className="text-sm font-semibold tracking-[0.2em] text-cyan-600 uppercase">
-            Hệ thống AI Chatbot hỏi đáp về thận
-          </p>
-          <h1 className="text-xl font-semibold text-slate-800 md:text-2xl">
-            Trợ lý tư vấn thận ảo
-          </h1>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="hidden items-center gap-2 md:flex">
-            <Link
-              to="/login"
-              className="rounded-full border border-teal-200 bg-white px-3 py-1.5 text-sm font-medium text-teal-700 transition hover:bg-teal-50"
-            >
-              Đăng nhập
-            </Link>
-            <Link
-              to="/register"
-              className="rounded-full bg-teal-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-teal-700"
-            >
-              Đăng ký
-            </Link>
-          </div>
-          <div className="inline-flex rounded-full border border-teal-200 bg-white p-1">
-            <button
-              type="button"
-              onClick={() => setInteractionMode("chat")}
-              className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${
-                interactionMode === "chat"
-                  ? "bg-teal-600 text-white"
-                  : "text-slate-600 hover:bg-teal-50"
-              }`}
-            >
-              Chat chữ
-            </button>
-            <button
-              type="button"
-              onClick={() => setInteractionMode("voice")}
-              className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${
-                interactionMode === "voice"
-                  ? "bg-teal-600 text-white"
-                  : "text-slate-600 hover:bg-teal-50"
-              }`}
-            >
-              Giao tiếp
-            </button>
-          </div>
-          <span className="rounded-full bg-emerald-50 px-4 py-1.5 text-sm font-medium text-emerald-700">
-            Phiên an toàn
-          </span>
-        </div>
-      </header>
+    <section className="flex h-screen w-full flex-col p-2 sm:p-0">
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-cols-2">
-        <div className="min-h-0">
-          <VirtualAvatarPanel
-            isListening={isListening}
-            isSpeaking={isSpeaking}
-            isThinking={isThinking}
-            onStopSpeaking={handleStopSpeaking}
+      <section
+        className="home-chat-grid relative min-h-0 flex-1 gap-2 sm:gap-0"
+        style={{ "--sidebar-width": isSidebarCollapsed ? "88px" : "320px" }}
+      >
+        <div className="order-1 flex h-full min-h-0 flex-col overflow-visible xl:col-start-1 xl:row-start-1 xl:order-none">
+          <ChatHistorySidebar
+            recentChats={recentChats}
+            activeChatId={activeChatId}
+            onNewChat={handleNewChat}
+            onSelectChat={handleSelectChat}
+            collapsed={isSidebarCollapsed}
+            onToggleCollapsed={handleToggleSidebar}
+            isDark={isDark}
+            onToggleTheme={toggleTheme}
+            onSetDark={setIsDark}
           />
         </div>
 
-        <div className="flex min-h-0 flex-col">
+        <div className="order-3 flex h-full min-h-0 flex-col rounded-3xl border border-teal-100 bg-white/80 p-4 shadow-lg shadow-cyan-100/60 backdrop-blur sm:rounded-none sm:border-x-0 sm:border-y-0 sm:shadow-none md:p-5 xl:col-start-2 xl:row-start-1 xl:order-none dark:border-slate-700 dark:bg-slate-900/80">
           <ChatWindow messages={messages} isThinking={isThinking} />
           {apiError ? (
-            <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+            <p className="mx-1 mb-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
               Lỗi kết nối API: {apiError}
             </p>
           ) : null}
@@ -405,12 +419,35 @@ export default function HomePage() {
             isSpeaking={isSpeaking}
             onStopSpeaking={handleStopSpeaking}
             interactionMode={interactionMode}
+            onInteractionModeChange={setInteractionMode}
             pendingImage={pendingImage}
             onPickImage={handleImagePick}
             onRemoveImage={handleRemoveImage}
+            quickReplies={QUICK_REPLIES}
+            onQuickReply={handleQuickReply}
           />
         </div>
-      </div>
+
+        <section
+          className={`order-2 relative hidden min-h-0 h-full 2xl:col-start-3 2xl:row-start-1 2xl:order-none 2xl:flex 2xl:flex-col ${showMobileAvatar ? "fixed inset-x-3 top-[5.5rem] z-40 block h-[38vh] 2xl:static 2xl:h-full" : ""}`}
+        >
+          <VirtualAvatarPanel
+            isListening={isListening}
+            isSpeaking={isSpeaking}
+            isThinking={isThinking}
+            onStopSpeaking={handleStopSpeaking}
+          />
+          {showMobileAvatar ? (
+            <button
+              type="button"
+              onClick={() => setShowMobileAvatar(false)}
+              className="absolute -bottom-3 left-1/2 z-50 -translate-x-1/2 rounded-full bg-slate-800 px-3 py-1 text-xs text-white 2xl:hidden"
+            >
+              Thu gọn avatar
+            </button>
+          ) : null}
+        </section>
+      </section>
     </section>
   );
 }

@@ -1,6 +1,15 @@
-import { ImagePlus, Mic, SendHorizonal, Square, X } from "lucide-react";
+import {
+  ArrowUp,
+  AudioLines,
+  ChevronDown,
+  Mic,
+  Plus,
+  Square,
+  X,
+} from "lucide-react";
+import QuickReplies from "../chat/QuickReplies";
 
-const waveDelays = [0, 120, 220, 320, 420];
+const waveDelays = [0, 100, 200, 300];
 
 export default function BottomInputArea({
   inputValue,
@@ -12,77 +21,75 @@ export default function BottomInputArea({
   isSpeaking,
   onStopSpeaking,
   interactionMode,
+  onInteractionModeChange,
   pendingImage,
   onPickImage,
   onRemoveImage,
+  quickReplies,
+  onQuickReply,
 }) {
   const voiceEnabled = interactionMode === "voice";
+  const canSend = Boolean(inputValue?.trim() || pendingImage) && !isThinking;
+
+  const handleVoiceClick = () => {
+    if (isSpeaking) {
+      onStopSpeaking();
+      return;
+    }
+    if (!voiceEnabled) {
+      onInteractionModeChange?.("voice");
+      return;
+    }
+    onToggleListening();
+  };
 
   return (
-    <section className="mt-4 rounded-3xl border border-teal-100 bg-white/90 p-5 shadow-xl shadow-cyan-100/70 backdrop-blur">
+    <section className="mt-auto shrink-0 pt-3 md:pt-4">
       {pendingImage && (
-        <div className="mb-3 inline-flex items-center gap-3 rounded-2xl bg-sky-50 p-2 pr-3">
+        <article className="mb-3 flex items-center gap-3 rounded-2xl border border-teal-100 bg-sky-50 px-3 py-2 shadow-sm dark:border-slate-600 dark:bg-slate-800">
           <img
             src={pendingImage.preview}
-            alt="Pending upload"
-            className="h-14 w-14 rounded-xl object-cover"
+            alt="Ảnh đính kèm"
+            className="h-12 w-12 rounded-lg object-cover"
           />
-          <div>
-            <p className="max-w-[10rem] truncate text-base font-medium text-slate-700">
+          <span className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-slate-700 dark:text-slate-100">
               {pendingImage.file.name}
             </p>
-            <p className="text-sm text-slate-500">Ảnh sẵn sàng gửi kèm tin nhắn</p>
-          </div>
+            <p className="text-xs text-slate-500">Sẽ gửi kèm tin nhắn</p>
+          </span>
           <button
             type="button"
             onClick={onRemoveImage}
-            className="rounded-full p-1 text-slate-400 transition hover:bg-white hover:text-rose-500"
+            className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white hover:text-rose-500 dark:hover:bg-slate-700"
+            aria-label="Xóa ảnh"
           >
             <X size={18} />
           </button>
-        </div>
+        </article>
       )}
 
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch">
-        <button
-          type="button"
-          onClick={isSpeaking ? onStopSpeaking : onToggleListening}
-          disabled={!voiceEnabled}
-          className={`relative flex h-[84px] w-full items-center justify-center overflow-hidden rounded-3xl px-6 text-base text-white shadow-lg transition lg:w-48 ${
-            isListening
-              ? "bg-rose-500 hover:bg-rose-600"
-              : voiceEnabled
-                ? "bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600"
-                : "cursor-not-allowed bg-slate-300 text-slate-600 shadow-none"
-          }`}
-        >
-          {isListening ? (
-            <>
-              <Square size={20} className="relative z-10 mr-2 fill-white" />
-              <span className="relative z-10 font-semibold">Đang ghi âm</span>
-              <div className="absolute inset-0 flex items-center justify-center gap-1 px-8">
-                {waveDelays.map((delay) => (
-                  <span
-                    key={delay}
-                    style={{ animationDelay: `${delay}ms` }}
-                    className="wave-bar h-8 w-1 rounded-full bg-white/65"
-                  />
-                ))}
-              </div>
-            </>
-          ) : (
-            <>
-              <Mic size={24} className="mr-2" />
-              <span className="font-semibold">
-                {voiceEnabled ? (isSpeaking ? "Dừng đọc" : "Nhấn để nói") : "Đang ở chat chữ"}
-              </span>
-            </>
-          )}
-        </button>
+      <article className="overflow-hidden rounded-3xl border border-teal-100 bg-white shadow-xl shadow-cyan-100/70 dark:border-slate-600 dark:bg-slate-900 dark:shadow-none">
+        <textarea
+          rows={3}
+          value={inputValue}
+          onChange={(event) => onInputChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              if (canSend) onSendMessage();
+            }
+          }}
+          placeholder="Tôi có thể giúp gì cho bạn về sức khỏe thận?"
+          className="block w-full resize-none border-none bg-transparent px-5 pt-5 pb-2 text-base leading-relaxed text-slate-700 placeholder:text-slate-400 outline-none dark:text-slate-100 dark:placeholder:text-slate-500"
+        />
 
-        <div className="flex h-[84px] flex-1 items-center gap-2 rounded-2xl border border-teal-100 bg-white px-4 py-3">
-          <label className="cursor-pointer rounded-xl p-2 text-teal-600 transition hover:bg-teal-50">
-            <ImagePlus size={20} />
+        <footer className="flex items-center justify-between gap-2 px-3 pb-3 pt-1">
+          <label
+            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-teal-600 transition hover:bg-teal-50 dark:text-teal-300 dark:hover:bg-slate-800"
+            title="Đính kèm ảnh xét nghiệm / bệnh án"
+          >
+            <Plus size={20} strokeWidth={2} />
             <input
               type="file"
               accept="image/*"
@@ -90,29 +97,99 @@ export default function BottomInputArea({
               onChange={onPickImage}
             />
           </label>
-          <textarea
-            rows={2}
-            value={inputValue}
-            onChange={(event) => onInputChange(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                onSendMessage();
-              }
-            }}
-            placeholder="Nhập triệu chứng hoặc câu hỏi về bệnh thận..."
-            className="h-full max-h-[70px] min-h-[56px] flex-1 resize-none border-none bg-transparent text-base text-slate-700 outline-none"
-          />
+
+          <button
+            type="button"
+            onClick={() =>
+              onInteractionModeChange?.(interactionMode === "voice" ? "chat" : "voice")
+            }
+            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm font-medium text-teal-700 transition hover:bg-teal-50 dark:text-teal-300 dark:hover:bg-slate-800"
+          >
+            {interactionMode === "voice" ? "Giao tiếp" : "Chat chữ"}
+            <ChevronDown size={14} className="opacity-60" />
+          </button>
+
+          <span className="flex-1" />
+
+          <button
+            type="button"
+            onClick={handleVoiceClick}
+            title={
+              isListening
+                ? "Dừng ghi âm"
+                : voiceEnabled
+                  ? "Nhấn để nói"
+                  : "Bật chế độ giao tiếp"
+            }
+            className={`relative flex h-11 shrink-0 items-center justify-center gap-2 overflow-hidden rounded-xl px-3.5 text-sm font-semibold shadow-md transition ${
+              isListening
+                ? "bg-rose-500 text-white ring-4 ring-rose-200/80 dark:ring-rose-900/60"
+                : voiceEnabled
+                  ? "voice-btn-active bg-gradient-to-r from-teal-500 to-cyan-500 text-white ring-4 ring-teal-200/90 hover:from-teal-600 hover:to-cyan-600 dark:ring-teal-800/80"
+                  : "border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100 dark:border-teal-700 dark:bg-teal-950 dark:text-teal-200"
+            }`}
+          >
+            {isListening ? (
+              <>
+                <Square size={18} className="relative z-10 shrink-0 fill-white" />
+                <span className="relative z-10 hidden sm:inline">Dừng ghi</span>
+                <span className="absolute inset-0 flex items-center justify-center gap-1 px-10 opacity-40">
+                  {waveDelays.map((delay) => (
+                    <span
+                      key={delay}
+                      style={{ animationDelay: `${delay}ms` }}
+                      className="wave-bar h-6 w-1 rounded-full bg-white/80"
+                    />
+                  ))}
+                </span>
+              </>
+            ) : isSpeaking ? (
+              <>
+                <Square size={18} className="shrink-0 fill-current" />
+                <span className="hidden sm:inline">Dừng đọc</span>
+              </>
+            ) : voiceEnabled ? (
+              <>
+                <span className="relative flex shrink-0 items-center">
+                  <Mic size={22} strokeWidth={2.5} />
+                  <AudioLines
+                    size={16}
+                    strokeWidth={2.5}
+                    className="absolute -right-2 -bottom-1 opacity-95"
+                    aria-hidden
+                  />
+                </span>
+                <span>Ghi âm</span>
+              </>
+            ) : (
+              <>
+                <Mic size={22} strokeWidth={2.5} className="shrink-0" />
+                <span className="hidden min-[400px]:inline">Bật micro</span>
+              </>
+            )}
+          </button>
+
           <button
             type="button"
             onClick={() => onSendMessage()}
-            disabled={Boolean(isThinking)}
-            className="rounded-xl bg-teal-600 p-3 text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:bg-teal-300"
+            disabled={!canSend}
+            aria-label="Gửi tin nhắn"
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition ${
+              canSend
+                ? "bg-teal-600 text-white shadow-md hover:bg-teal-700"
+                : "cursor-not-allowed bg-teal-100 text-teal-300 dark:bg-slate-700 dark:text-slate-500"
+            }`}
           >
-            <SendHorizonal size={20} />
+            <ArrowUp size={20} strokeWidth={2.5} />
           </button>
-        </div>
-      </div>
+        </footer>
+      </article>
+
+      <QuickReplies
+        suggestions={quickReplies}
+        onSelect={onQuickReply}
+        disabled={Boolean(isThinking)}
+      />
     </section>
   );
 }

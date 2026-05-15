@@ -1,3 +1,4 @@
+import { Bot } from "lucide-react";
 import { useEffect, useRef } from "react";
 import MessageBubble from "./MessageBubble";
 
@@ -11,36 +12,36 @@ export default function ChatWindow({ messages, isThinking }) {
   }, [messages, isThinking]);
 
   return (
-    <section className="flex h-full min-h-0 flex-col rounded-3xl border border-teal-100 bg-white/80 p-5 shadow-lg shadow-cyan-100/60 backdrop-blur">
-      <header className="mb-4 flex items-center justify-between">
-        <div>
-          <p className="text-sm font-semibold tracking-[0.22em] text-teal-600 uppercase">
-            Phiên tư vấn
-          </p>
-          <h2 className="text-2xl font-semibold text-slate-800">Hội thoại</h2>
-        </div>
-        <span className="rounded-full bg-teal-50 px-3 py-1.5 text-sm text-teal-700">
-          {messages.length} tin nhắn
-        </span>
+    <section className="flex min-h-0 flex-1 flex-col">
+      <header className="mb-3 shrink-0 px-1">
+        <p className="text-sm font-semibold tracking-[0.18em] text-teal-600 uppercase dark:text-teal-400">
+          Phiên tư vấn
+        </p>
+        <h2 className="text-xl font-semibold text-slate-800 md:text-2xl dark:text-slate-100">
+          Hội thoại
+        </h2>
       </header>
 
-      <div ref={listRef} className="flex-1 space-y-4 overflow-y-auto pr-1">
+      <div
+        ref={listRef}
+        className="min-h-0 flex-1 space-y-4 overflow-y-auto px-1 pb-2"
+      >
         {messages.map((message) => (
           <MessageBubble key={message.id} message={message} />
         ))}
         {isThinking ? (
-          <article className="flex justify-start">
-            <div className="max-w-[75%] rounded-2xl border border-teal-100 bg-white px-5 py-4 text-slate-700 shadow-sm">
-              <p className="mb-2 text-xs font-semibold tracking-wide text-teal-600 uppercase">
-                KidneyCare AI
-              </p>
-              <div className="flex items-center gap-2 text-sm text-slate-500">
-                <span>Đang suy nghĩ</span>
+          <article className="flex items-end gap-2.5">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full border border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-800 dark:bg-teal-950 dark:text-teal-300">
+              <Bot size={17} />
+            </span>
+            <span className="max-w-[75%] rounded-2xl rounded-bl-sm border border-teal-100 bg-white px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              <span className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                Đang suy nghĩ
                 <span className="thinking-dot" />
                 <span className="thinking-dot" />
                 <span className="thinking-dot" />
-              </div>
-            </div>
+              </span>
+            </span>
           </article>
         ) : null}
       </div>
