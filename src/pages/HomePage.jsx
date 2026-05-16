@@ -5,7 +5,7 @@ import ChatWindow from "../components/chat/ChatWindow";
 import BottomInputArea from "../components/input/BottomInputArea";
 import { QUICK_REPLIES } from "../constants/quickReplies";
 import { useTheme } from "../hooks/useTheme";
-import { askChatbot, analyzeAndAnswerHealthReportImage, prepareTtsText } from "../services/chatbotApi";
+import { analyzeAndAnswerHealthReportImage, prepareTtsText, streamChatbot } from "../services/chatbotApi";
 
 function pickBestVietnameseVoice(voices) {
   if (!Array.isArray(voices) || voices.length === 0) return null;
@@ -284,18 +284,52 @@ export default function HomePage() {
           topK: 5,
         });
       } else {
-        result = await askChatbot({
+        const assistantMessageId = `a-${Date.now()}`;
+        let hasStartedStreaming = false;
+        let streamedAnswer = "";
+        const upsertAssistantMessage = (content, replace = false) => {
+          setMessages((prev) => {
+            const exists = prev.some((message) => message.id === assistantMessageId);
+            if (!exists) {
+              return [...prev, { id: assistantMessageId, role: "assistant", content }];
+            }
+            return prev.map((message) => (
+              message.id === assistantMessageId
+                ? {
+                    ...message,
+                    content: replace ? content : `${message.content}${content}`,
+                  }
+                : message
+            ));
+          });
+        };
+
+        result = await streamChatbot({
           query: userText || "Phân tích ảnh đã tải lên",
           topK: 5,
           includeDebug: false,
+          onToken: (token) => {
+            streamedAnswer += token;
+            if (!hasStartedStreaming) {
+              hasStartedStreaming = true;
+              setIsThinking(false);
+            }
+            upsertAssistantMessage(token);
+          },
+          onDone: (payload) => {
+            const finalAnswer = payload?.answer || streamedAnswer || "Mình chưa tạo được câu trả lời từ hệ thống.";
+            upsertAssistantMessage(finalAnswer, true);
+          },
         });
       }
 
-      addMessage({
-        id: `a-${Date.now()}`,
-        role: "assistant",
-        content: result?.answer || "Mình chưa tạo được câu trả lời từ hệ thống.",
-      });
+      if (pendingImageForMessage?.file) {
+        addMessage({
+          id: `a-${Date.now()}`,
+          role: "assistant",
+          content: result?.answer || "Mình chưa tạo được câu trả lời từ hệ thống.",
+        });
+      }
       const spoken = result?.answer || "";
       if (interactionMode === "voice" && spoken && typeof window !== "undefined" && window.speechSynthesis) {
         try {

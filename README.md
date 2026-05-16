@@ -9,6 +9,16 @@ npm install
 npm run dev
 ```
 
+## Local backend
+
+Frontend doc API backend tu bien moi truong:
+
+```bash
+VITE_CHATBOT_API_BASE_URL=http://localhost:8008
+```
+
+File local da co san trong `.env`; neu doi host backend, chi can cap nhat bien nay.
+
 ## Project structure
 
 - `src/components`: reusable UI components
