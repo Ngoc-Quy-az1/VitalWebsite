@@ -7,6 +7,31 @@ function resolveUrl(path) {
   return `/api${path}`;
 }
 
+async function explainApiMisconfiguration(status) {
+  if (status !== 404) {
+    return null;
+  }
+  try {
+    const healthRes = await fetch(resolveUrl("/health"));
+    if (!healthRes.ok) {
+      return "Không kết nối được chatbot API (cổng 8000). Chạy: .\\scripts\\run_chatbot_api.ps1 trong VitalAI.";
+    }
+    const health = await healthRes.json();
+    if (health?.service === "vitalai-medical-tools") {
+      return (
+        "Cổng 8000 đang chạy medical_tools (sai). Dừng lệnh uvicorn medical_tools trên cổng 8000, " +
+        "chạy medical_tools trên 8010 (.\\scripts\\run_medical_tools.ps1) và chatbot trên 8000 (.\\scripts\\run_chatbot_api.ps1)."
+      );
+    }
+    if (health?.service !== "vitalai-chatbot-api") {
+      return `API /health trả service không mong đợi: ${health?.service ?? "unknown"}.`;
+    }
+  } catch {
+    return "Không kết nối được chatbot API. Kiểm tra backend VitalAI đang chạy trên cổng 8000.";
+  }
+  return null;
+}
+
 export async function askChatbot({
   query,
   topK = 5,
@@ -60,6 +85,10 @@ export async function askChatbot({
   }
 
   if (!response.ok) {
+    const misconfig = await explainApiMisconfiguration(response.status);
+    if (misconfig) {
+      throw new Error(misconfig);
+    }
     let detail = `HTTP ${response.status}`;
     try {
       const data = await response.json();
@@ -127,6 +156,7 @@ export async function analyzeAndAnswerHealthReportImage({
   language = "vi",
   patientId = null,
   topK = 5,
+  timeoutMs = 300000,
 }) {
   const formData = new FormData();
   formData.append("file", file);
@@ -137,10 +167,23 @@ export async function analyzeAndAnswerHealthReportImage({
     formData.append("patient_id", patientId);
   }
 
-  const response = await fetch(resolveUrl("/health-report/analyze-and-answer"), {
-    method: "POST",
-    body: formData,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  let response;
+  try {
+    response = await fetch(resolveUrl("/health-report/analyze-and-answer"), {
+      method: "POST",
+      body: formData,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error("Phân tích ảnh quá thời gian chờ (OCR + AI). Vui lòng thử lại.");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
     let detail = `HTTP ${response.status}`;

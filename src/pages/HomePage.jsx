@@ -327,8 +327,7 @@ export default function HomePage() {
       addMessage({
         id: `a-${Date.now()}`,
         role: "assistant",
-        content:
-          "Mình chưa kết nối được chatbot backend. Vui lòng kiểm tra API service và thử lại.",
+        content: `Không xử lý được yêu cầu: ${message}`,
       });
       setIsSpeaking(false);
     } finally {
