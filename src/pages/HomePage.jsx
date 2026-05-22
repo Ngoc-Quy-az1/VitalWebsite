@@ -5,7 +5,10 @@ import ChatWindow from "../components/chat/ChatWindow";
 import BottomInputArea from "../components/input/BottomInputArea";
 import { QUICK_REPLIES } from "../constants/quickReplies";
 import { useTheme } from "../hooks/useTheme";
-import { analyzeAndAnswerHealthReportImage, prepareTtsText, streamChatbot } from "../services/chatbotApi";
+import { analyzeAndAnswerHealthReportImage, prepareTtsText, streamChatbot, fetchWithAuth, voiceStt } from "../services/chatbotApi";
+import { useLanguage } from "../contexts/LanguageContext";
+import UpgradePage from "../components/profile/UpgradePage";
+import InteractiveTour from "../components/tour/InteractiveTour";
 
 function pickBestVietnameseVoice(voices) {
   if (!Array.isArray(voices) || voices.length === 0) return null;
@@ -40,69 +43,223 @@ const starterMessages = [
   },
 ];
 
-const initialRecentChats = [
-  {
-    id: "chat-1",
-    title: "Năm case lâm sàng mẫu",
-    preview: "Tóm tắt hướng xử lý và dấu hiệu cần theo dõi",
-  },
-  {
-    id: "chat-2",
-    title: "Sửa cấu trúc JSON và thêm trường",
-    preview: "Điều chỉnh dữ liệu đầu vào để chatbot đọc đúng",
-  },
-  {
-    id: "chat-3",
-    title: "Nhận diện mã số trong ảnh xét nghiệm",
-    preview: "Phân tích ảnh tải lên và rút trích thông tin",
-  },
-  {
-    id: "chat-4",
-    title: "Điền dữ liệu thiếu trong file",
-    preview: "Bổ sung trường còn trống từ nguồn hiện có",
-  },
-];
-
 export default function HomePage() {
-  const [messages, setMessages] = useState(starterMessages);
-  const [recentChats, setRecentChats] = useState(initialRecentChats);
-  const [activeChatId, setActiveChatId] = useState(initialRecentChats[0].id);
+  const { t, language } = useLanguage();
+  const [activeView, setActiveView] = useState("chat"); // 'chat' or 'upgrade'
+  const [customPlan, setCustomPlan] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("vital_plan") || "Standard Plan";
+    }
+    return "Standard Plan";
+  });
+
+  const handleUpgradeSuccess = () => {
+    localStorage.setItem("vital_plan", "Premium Pro");
+    setCustomPlan("Premium Pro");
+  };
+
+  const [messages, setMessages] = useState(() => {
+    return starterMessages.map((msg) => {
+      if (msg.id === "m1") return { ...msg, content: t("starterGreeting") };
+      if (msg.id === "m2") return { ...msg, content: t("starterDisclaimer") };
+      return msg;
+    });
+  });
+  const [recentChats, setRecentChats] = useState([]);
+  const [activeChatId, setActiveChatId] = useState(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [interactionMode, setInteractionMode] = useState("chat");
-  const [pendingImage, setPendingImage] = useState(null);
+  const [pendingImages, setPendingImages] = useState([]);
   const [isListening, setIsListening] = useState(false);
+  const [useServerStt] = useState(false); // use browser SpeechRecognition by default
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [apiError, setApiError] = useState("");
   const [showMobileAvatar, setShowMobileAvatar] = useState(false);
   const { isDark, toggleTheme, setIsDark } = useTheme();
   const recognitionRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const recordedChunksRef = useRef([]);
   const silenceTimeoutRef = useRef(null);
   const transcriptBufferRef = useRef("");
   const manualStopRef = useRef(false);
+  const autoSubmitVoiceRef = useRef(false);
   const sendLockRef = useRef(false);
   const lastSentRef = useRef({ text: "", ts: 0 });
+
+  const refreshSessionsList = async (targetActiveId = null) => {
+    try {
+      const response = await fetchWithAuth("/auth-api/chat/sessions");
+      if (response.ok) {
+        const sessions = await response.json();
+        setRecentChats(sessions);
+        if (targetActiveId) {
+          setActiveChatId(targetActiveId);
+        } else if (sessions.length > 0 && !activeChatId) {
+          setActiveChatId(sessions[0].id);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to refresh sessions:", err);
+    }
+  };
+
+  const consumeFreshLoginFlag = () => {
+    try {
+      const isFreshLogin = sessionStorage.getItem("vital_fresh_login") === "1";
+      if (isFreshLogin) {
+        sessionStorage.removeItem("vital_fresh_login");
+      }
+      return isFreshLogin;
+    } catch {
+      return false;
+    }
+  };
+
+  const createNewSession = async (title = "Cuộc trò chuyện mới") => {
+    try {
+      const response = await fetchWithAuth("/auth-api/chat/sessions", {
+        method: "POST",
+        body: JSON.stringify({ title }),
+      });
+      if (response.ok) {
+        const newSession = await response.json();
+        setRecentChats((prev) => [newSession, ...prev]);
+        setActiveChatId(newSession.id);
+        return newSession;
+      }
+    } catch (err) {
+      console.error("Failed to create new session:", err);
+    }
+  };
+
+  // Fetch all user sessions on mount (do not auto-create a session here)
+  useEffect(() => {
+    async function initChats() {
+      try {
+        const response = await fetchWithAuth("/auth-api/chat/sessions");
+        if (response.ok) {
+          const sessions = await response.json();
+          const isFreshLogin = consumeFreshLoginFlag();
+
+          if (sessions && sessions.length > 0) {
+            if (isFreshLogin) {
+              const newSession = await createNewSession("Cuộc trò chuyện mới");
+              setRecentChats((prev) => (newSession ? [newSession, ...prev] : sessions));
+              if (newSession?.id) {
+                setActiveChatId(newSession.id);
+              }
+            } else {
+              setRecentChats(sessions);
+              setActiveChatId(sessions[0].id);
+            }
+          } else {
+            // no sessions yet; create a new one for the first visit or fresh login
+            const newSession = await createNewSession("Cuộc trò chuyện mới");
+            if (!newSession?.id) {
+              setRecentChats([]);
+              setActiveChatId(null);
+              return;
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load user chat sessions:", err);
+      }
+    }
+    initChats();
+  }, []);
+
+  // When user has just logged in (fresh), auto-create a new session and open it.
+  useEffect(() => {
+    const handler = async () => {
+      try {
+        const newSession = await createNewSession("Cuộc trò chuyện mới");
+        if (newSession && newSession.id) {
+          setActiveChatId(newSession.id);
+        }
+      } catch (err) {
+        console.error("Failed to create session on login:", err);
+      }
+    };
+    window.addEventListener("auth-just-logged-in", handler);
+    return () => window.removeEventListener("auth-just-logged-in", handler);
+  }, []);
+
+  // Fetch messages when activeChatId changes
+  useEffect(() => {
+    if (!activeChatId) return;
+
+    async function loadMessages() {
+      try {
+        const response = await fetchWithAuth(`/auth-api/chat/sessions/${activeChatId}/messages`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.length > 0) {
+            const mapped = data.map((msg) => ({
+              id: msg.id,
+              role: msg.sender_type === "USER" ? "user" : "assistant",
+              content: msg.message_type === 'IMAGE' ? '' : msg.content,
+              imagePreviews: msg.message_type === 'IMAGE' ? [msg.content] : undefined,
+            }));
+            setMessages(mapped);
+          } else {
+            setMessages(
+              starterMessages.map((msg) => {
+                if (msg.id === "m1") return { ...msg, content: t("starterGreeting") };
+                if (msg.id === "m2") return { ...msg, content: t("starterDisclaimer") };
+                return msg;
+              })
+            );
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load chat messages:", err);
+      }
+    }
+
+    loadMessages();
+  }, [activeChatId, language]);
+
+  // Sync starter messages with language updates (when viewing a new empty session)
+  useEffect(() => {
+    if (messages.length === starterMessages.length) {
+      setMessages((prev) =>
+        prev.map((msg) => {
+          if (msg.id === "m1") {
+            return { ...msg, content: t("starterGreeting") };
+          }
+          if (msg.id === "m2") {
+            return { ...msg, content: t("starterDisclaimer") };
+          }
+          return msg;
+        })
+      );
+    }
+  }, [language]);
 
   const addMessage = (message) => {
     setMessages((prev) => [...prev, message]);
   };
 
-  const handleNewChat = () => {
-    const newChatId = `chat-${Date.now()}`;
-    setMessages(starterMessages);
+  const handleNewChat = async () => {
     setInputValue("");
-    setPendingImage(null);
+    setPendingImages([]);
     setApiError("");
-    setActiveChatId(newChatId);
-    setRecentChats((prev) => [
-      {
-        id: newChatId,
-        title: "Cuộc trò chuyện mới",
-        preview: "Bắt đầu một phiên tư vấn mới",
-      },
-      ...prev,
-    ].slice(0, 4));
+    const newSession = await createNewSession("Cuộc trò chuyện mới");
+
+    if (!newSession?.id) {
+      return;
+    }
+
+    setMessages(
+      starterMessages.map((msg) => {
+        if (msg.id === "m1") return { ...msg, content: t("starterGreeting") };
+        if (msg.id === "m2") return { ...msg, content: t("starterDisclaimer") };
+        return msg;
+      })
+    );
   };
 
   const handleSelectChat = (chatId) => {
@@ -130,6 +287,73 @@ export default function HomePage() {
       }
     }
 
+    // If configured to use server STT (PhoWhisper), record audio, send to backend
+    if (useServerStt) {
+      if (isListening) {
+        // stop recording
+        try {
+          mediaRecorderRef.current?.stop();
+        } catch (e) {
+          // ignore
+        }
+        setIsListening(false);
+        return;
+      }
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setApiError('Trình duyệt không hỗ trợ ghi âm.');
+        return;
+      }
+
+      const startRecording = async () => {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const options = {};
+          const mediaRecorder = new MediaRecorder(stream, options);
+          recordedChunksRef.current = [];
+
+          mediaRecorder.ondataavailable = (ev) => {
+            if (ev.data && ev.data.size > 0) recordedChunksRef.current.push(ev.data);
+          };
+
+          mediaRecorder.onstop = async () => {
+            try {
+              const blob = new Blob(recordedChunksRef.current, { type: recordedChunksRef.current[0]?.type || 'audio/webm' });
+              const audioBase64 = await blobToWavBase64(blob);
+              setIsListening(false);
+              setApiError('');
+              try {
+                const resp = await voiceStt({ audio_base64: audioBase64, language: 'vi' });
+                const text = resp?.text || '';
+                if (text) {
+                  setInputValue(text);
+                  await handleSendMessage(text, 'voice');
+                }
+              } catch (err) {
+                setApiError(err?.message || 'STT server error');
+              }
+            } catch (err) {
+              setApiError('Không thể xử lý file âm thanh.');
+              setIsListening(false);
+            }
+            // stop all tracks
+            try { stream.getTracks().forEach((t) => t.stop()); } catch {}
+          };
+
+          mediaRecorder.start();
+          mediaRecorderRef.current = mediaRecorder;
+          setIsListening(true);
+          setApiError('');
+        } catch (err) {
+          setApiError('Không thể truy cập micro: ' + (err?.message || String(err)));
+          setIsListening(false);
+        }
+      };
+
+      startRecording();
+      return;
+    }
+    // Otherwise use browser SpeechRecognition (Web Speech API)
     if (typeof window === "undefined") return;
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -143,6 +367,35 @@ export default function HomePage() {
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.maxAlternatives = 1;
+
+      const submitVoiceTranscript = async (transcript) => {
+        const normalized = String(transcript || "").trim();
+        if (!normalized || autoSubmitVoiceRef.current) return;
+
+        const now = Date.now();
+        const lastText = lastSentRef.current.text;
+        const lastTs = lastSentRef.current.ts;
+        if (normalized === lastText && now - lastTs < 1500) {
+          return;
+        }
+
+        autoSubmitVoiceRef.current = true;
+        if (silenceTimeoutRef.current) {
+          clearTimeout(silenceTimeoutRef.current);
+          silenceTimeoutRef.current = null;
+        }
+        manualStopRef.current = true;
+        transcriptBufferRef.current = "";
+        setIsListening(false);
+
+        try {
+          recognition.stop();
+        } catch {
+          // ignore
+        }
+
+        await handleSendMessage(normalized, "voice");
+      };
 
       recognition.onresult = (event) => {
         let finalizedText = "";
@@ -159,6 +412,7 @@ export default function HomePage() {
           const merged = `${transcriptBufferRef.current} ${finalizedText}`.trim();
           transcriptBufferRef.current = merged;
           setInputValue(merged);
+          void submitVoiceTranscript(merged);
         }
 
         if (silenceTimeoutRef.current) {
@@ -176,6 +430,12 @@ export default function HomePage() {
           clearTimeout(silenceTimeoutRef.current);
           silenceTimeoutRef.current = null;
         }
+        if (autoSubmitVoiceRef.current) {
+          autoSubmitVoiceRef.current = false;
+          manualStopRef.current = false;
+          setIsListening(false);
+          return;
+        }
         const transcript = transcriptBufferRef.current.trim();
         transcriptBufferRef.current = "";
         manualStopRef.current = false;
@@ -190,6 +450,7 @@ export default function HomePage() {
           silenceTimeoutRef.current = null;
         }
         transcriptBufferRef.current = "";
+        autoSubmitVoiceRef.current = false;
         setIsListening(false);
       };
       recognitionRef.current = recognition;
@@ -204,6 +465,7 @@ export default function HomePage() {
 
     try {
       transcriptBufferRef.current = "";
+      autoSubmitVoiceRef.current = false;
       if (silenceTimeoutRef.current) {
         clearTimeout(silenceTimeoutRef.current);
         silenceTimeoutRef.current = null;
@@ -223,27 +485,125 @@ export default function HomePage() {
     }
   };
 
+  // Convert recorded Blob (webm/ogg) -> WAV PCM16 @16k and return base64 string
+  async function blobToWavBase64(blob) {
+    const arrayBuffer = await blob.arrayBuffer();
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioCtx();
+    const decoded = await audioCtx.decodeAudioData(arrayBuffer);
+    const targetRate = 16000;
+    const offlineCtx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, Math.ceil(decoded.duration * targetRate), targetRate);
+    const bufferSource = offlineCtx.createBufferSource();
+    bufferSource.buffer = decoded;
+    bufferSource.connect(offlineCtx.destination);
+    bufferSource.start(0);
+    const rendered = await offlineCtx.startRendering();
+    const channelData = rendered.getChannelData(0);
+
+    const wavBuffer = encodeWAV(channelData, targetRate);
+    const wavUint8 = new Uint8Array(wavBuffer);
+    let binary = "";
+    for (let i = 0; i < wavUint8.length; i++) binary += String.fromCharCode(wavUint8[i]);
+    return btoa(binary);
+  }
+
+  function encodeWAV(samples, sampleRate) {
+    function writeString(view, offset, string) {
+      for (let i = 0; i < string.length; i++) view.setUint8(offset + i, string.charCodeAt(i));
+    }
+
+    const buffer = new ArrayBuffer(44 + samples.length * 2);
+    const view = new DataView(buffer);
+    writeString(view, 0, 'RIFF');
+    view.setUint32(4, 36 + samples.length * 2, true);
+    writeString(view, 8, 'WAVE');
+    writeString(view, 12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeString(view, 36, 'data');
+    view.setUint32(40, samples.length * 2, true);
+
+    let offset = 44;
+    for (let i = 0; i < samples.length; i++, offset += 2) {
+      let s = Math.max(-1, Math.min(1, samples[i]));
+      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    }
+    return buffer;
+  }
+
   const handleImagePick = (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const preview = URL.createObjectURL(file);
-    setPendingImage({ file, preview });
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+
+    // Ensure we have an active session to attach files to
+    const ensureSession = async () => {
+      if (!activeChatId) {
+        const s = await createNewSession();
+        return s?.id;
+      }
+      return activeChatId;
+    };
+
+    const newItems = files.map((file) => ({ file, preview: URL.createObjectURL(file), uploading: true }));
+    setPendingImages((prev) => [...prev, ...newItems]);
     setIsThinking(true);
-    setTimeout(() => setIsThinking(false), 1200);
+
+    (async () => {
+      try {
+        const sessionId = await ensureSession();
+        for (const file of files) {
+          const form = new FormData();
+          form.append('file', file);
+          if (sessionId) form.append('session_id', sessionId);
+
+          const resp = await fetchWithAuth('/auth-api/files/upload', {
+            method: 'POST',
+            body: form,
+          });
+
+          if (!resp.ok) {
+            console.error('Upload failed:', resp.status);
+            continue;
+          }
+
+          const data = await resp.json();
+          const saved = data?.file || data;
+          const url = saved?.file_path || saved?.file?.file_path || saved?.file_path;
+
+          // Add persisted image as a user message so it shows after reload
+          if (url) {
+            addMessage({ id: `u-img-${Date.now()}`, role: 'user', content: '', imagePreviews: [url] });
+          }
+        }
+      } catch (err) {
+        console.error('Image upload error:', err);
+      } finally {
+        // cleanup previews and state
+        setPendingImages([]);
+        setIsThinking(false);
+        event.target.value = null;
+      }
+    })();
   };
 
-  const handleRemoveImage = () => {
-    if (pendingImage?.preview) {
-      URL.revokeObjectURL(pendingImage.preview);
-    }
-    setPendingImage(null);
+  const handleRemoveImage = (index) => {
+    setPendingImages((prev) => {
+      const item = prev[index];
+      if (item?.preview) URL.revokeObjectURL(item.preview);
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
   const handleSendMessage = async (overrideText = null, source = "manual") => {
     const draftText = String(overrideText ?? inputValue ?? "").trim();
-    if (!draftText && !pendingImage) return;
+    if (!draftText && pendingImages.length === 0) return;
     if (sendLockRef.current) return;
-    const pendingImageForMessage = pendingImage;
+    const pendingImagesForMessage = pendingImages;
 
     const now = Date.now();
     const lastText = lastSentRef.current.text;
@@ -262,11 +622,10 @@ export default function HomePage() {
       id: `u-${Date.now()}`,
       role: "user",
       content: userText || "(uploaded image)",
-      imagePreview: pendingImageForMessage?.preview,
+      imagePreviews: pendingImagesForMessage.map((p) => p.preview),
     });
-    // Clear composer image immediately after submitting.
-    // Keep preview on the sent message bubble via pendingImageForMessage.
-    setPendingImage(null);
+    // Clear composer images immediately after submitting.
+    setPendingImages([]);
 
     setApiError("");
     setInputValue("");
@@ -275,13 +634,16 @@ export default function HomePage() {
 
     try {
       let result;
-      if (pendingImageForMessage?.file) {
+      if (pendingImagesForMessage?.length) {
+        // For analysis we send the first image file to the backend. UI retains multiple previews.
+        const firstFile = pendingImagesForMessage[0].file;
         result = await analyzeAndAnswerHealthReportImage({
-          file: pendingImageForMessage.file,
+          file: firstFile,
           question: userText || "Phân tích ảnh đã tải lên",
           language: "vi",
           patientId: null,
           topK: 5,
+          sessionId: activeChatId,
         });
       } else {
         const assistantMessageId = `a-${Date.now()}`;
@@ -308,6 +670,7 @@ export default function HomePage() {
           query: userText || "Phân tích ảnh đã tải lên",
           topK: 5,
           includeDebug: false,
+          sessionId: activeChatId,
           onToken: (token) => {
             streamedAnswer += token;
             if (!hasStartedStreaming) {
@@ -319,16 +682,18 @@ export default function HomePage() {
           onDone: (payload) => {
             const finalAnswer = payload?.answer || streamedAnswer || "Mình chưa tạo được câu trả lời từ hệ thống.";
             upsertAssistantMessage(finalAnswer, true);
+            refreshSessionsList();
           },
         });
       }
 
-      if (pendingImageForMessage?.file) {
+      if (pendingImagesForMessage?.length) {
         addMessage({
           id: `a-${Date.now()}`,
           role: "assistant",
           content: result?.answer || "Mình chưa tạo được câu trả lời từ hệ thống.",
         });
+        refreshSessionsList();
       }
       const spoken = result?.answer || "";
       if (interactionMode === "voice" && spoken && typeof window !== "undefined" && window.speechSynthesis) {
@@ -399,6 +764,7 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
+    setIsThinking(false);
     if (interactionMode === "voice") return;
     setIsListening(false);
     setIsSpeaking(false);
@@ -414,12 +780,39 @@ export default function HomePage() {
     }
   }, [interactionMode]);
 
+  const getTranslatedQuickReplies = () => [
+    {
+      id: "symptoms",
+      label: language === "VI" ? "Triệu chứng" : "Symptoms",
+      prompt: language === "VI" ? "Dấu hiệu suy thận giai đoạn 1 là gì?" : "What are the signs of stage 1 kidney failure?",
+      icon: QUICK_REPLIES[0].icon,
+    },
+    {
+      id: "labs",
+      label: language === "VI" ? "Xét nghiệm" : "Lab Tests",
+      prompt: language === "VI" ? "Creatinine cao có nguy hiểm không?" : "Is high creatinine dangerous?",
+      icon: QUICK_REPLIES[1].icon,
+    },
+    {
+      id: "diet",
+      label: language === "VI" ? "Ăn uống" : "Diet",
+      prompt: language === "VI" ? "Chế độ ăn uống cho người bệnh thận" : "Dietary plan for kidney patients",
+      icon: QUICK_REPLIES[2].icon,
+    },
+    {
+      id: "emergency",
+      label: language === "VI" ? "Khẩn cấp" : "Emergency",
+      prompt: language === "VI" ? "Khi nào cần đi khám cấp cứu?" : "When should I go to the emergency room?",
+      icon: QUICK_REPLIES[3].icon,
+    },
+  ];
+
   return (
     <section className="flex h-screen w-full flex-col p-2 sm:p-0">
 
       <section
         className="home-chat-grid relative min-h-0 flex-1 gap-2 sm:gap-0"
-        style={{ "--sidebar-width": isSidebarCollapsed ? "88px" : "320px" }}
+        style={{ "--sidebar-width": isSidebarCollapsed ? "60px" : "320px" }}
       >
         <div className="order-1 flex h-full min-h-0 flex-col overflow-visible xl:col-start-1 xl:row-start-1 xl:order-none">
           <ChatHistorySidebar
@@ -432,36 +825,55 @@ export default function HomePage() {
             isDark={isDark}
             onToggleTheme={toggleTheme}
             onSetDark={setIsDark}
+            onNavigateUpgrade={() => setActiveView("upgrade")}
           />
         </div>
 
-        <div className="order-3 flex h-full min-h-0 flex-col rounded-3xl border border-teal-100 bg-white/80 p-4 shadow-lg shadow-cyan-100/60 backdrop-blur sm:rounded-none sm:border-x-0 sm:border-y-0 sm:shadow-none md:p-5 xl:col-start-2 xl:row-start-1 xl:order-none dark:border-slate-700 dark:bg-slate-900/80">
-          <ChatWindow messages={messages} isThinking={isThinking} />
-          {apiError ? (
-            <p className="mx-1 mb-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
-              Lỗi kết nối API: {apiError}
-            </p>
-          ) : null}
-          <BottomInputArea
-            inputValue={inputValue}
-            onInputChange={setInputValue}
-            onSendMessage={handleSendMessage}
-            isThinking={isThinking}
-            isListening={isListening}
-            onToggleListening={handleToggleListening}
-            isSpeaking={isSpeaking}
-            onStopSpeaking={handleStopSpeaking}
-            interactionMode={interactionMode}
-            onInteractionModeChange={setInteractionMode}
-            pendingImage={pendingImage}
-            onPickImage={handleImagePick}
-            onRemoveImage={handleRemoveImage}
-            quickReplies={QUICK_REPLIES}
-            onQuickReply={handleQuickReply}
-          />
+        <div 
+          data-tour="chat-window" 
+          className="order-3 flex h-full min-h-0 flex-col rounded-3xl border border-teal-100 bg-white/80 p-4 shadow-lg shadow-cyan-100/60 backdrop-blur sm:rounded-none sm:border-x-0 sm:border-y-0 sm:shadow-none md:p-5 xl:col-start-2 xl:row-start-1 xl:order-none dark:border-slate-700 dark:bg-slate-900/80"
+        >
+          {activeView === "upgrade" ? (
+            <UpgradePage
+              onBack={() => setActiveView("chat")}
+              onUpgradeSuccess={handleUpgradeSuccess}
+              currentPlan={customPlan}
+            />
+          ) : (
+            <>
+              <ChatWindow messages={messages} isThinking={isThinking} />
+
+              {apiError ? (
+                <p className="mx-1 mb-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
+                  Lỗi kết nối API: {apiError}
+                </p>
+              ) : null}
+              
+              <div data-tour="input" className="w-full">
+                <BottomInputArea
+                  inputValue={inputValue}
+                  onInputChange={setInputValue}
+                  onSendMessage={handleSendMessage}
+                  isThinking={isThinking}
+                  isListening={isListening}
+                  onToggleListening={handleToggleListening}
+                  isSpeaking={isSpeaking}
+                  onStopSpeaking={handleStopSpeaking}
+                  interactionMode={interactionMode}
+                  onInteractionModeChange={setInteractionMode}
+                  pendingImage={pendingImages}
+                  onPickImage={handleImagePick}
+                  onRemoveImage={handleRemoveImage}
+                  quickReplies={getTranslatedQuickReplies()}
+                  onQuickReply={handleQuickReply}
+                />
+              </div>
+            </>
+          )}
         </div>
 
         <section
+          data-tour="avatar"
           className={`order-2 relative hidden min-h-0 h-full 2xl:col-start-3 2xl:row-start-1 2xl:order-none 2xl:flex 2xl:flex-col ${showMobileAvatar ? "fixed inset-x-3 top-[5.5rem] z-40 block h-[38vh] 2xl:static 2xl:h-full" : ""}`}
         >
           <VirtualAvatarPanel
@@ -481,6 +893,9 @@ export default function HomePage() {
           ) : null}
         </section>
       </section>
+
+      {/* Global Interactive Tour spotlight onboarding */}
+      <InteractiveTour />
     </section>
   );
 }

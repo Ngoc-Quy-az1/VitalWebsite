@@ -7,11 +7,14 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "http://localhost:8000",
+        target: "http://localhost:3000",
         changeOrigin: true,
-        timeout: 300000,
-        proxyTimeout: 300000,
         rewrite: (path) => path.replace(/^\/api/, ""),
+      },
+      "/auth-api": {
+        target: "http://localhost:3000",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/auth-api/, "/api"),
       },
     },
   },

@@ -1,9 +1,11 @@
 import { Bot } from "lucide-react";
 import { useEffect, useRef } from "react";
 import MessageBubble from "./MessageBubble";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 export default function ChatWindow({ messages, isThinking }) {
   const listRef = useRef(null);
+  const { t } = useLanguage();
 
   useEffect(() => {
     const el = listRef.current;
@@ -15,10 +17,10 @@ export default function ChatWindow({ messages, isThinking }) {
     <section className="flex min-h-0 flex-1 flex-col">
       <header className="mb-3 shrink-0 px-1">
         <p className="text-sm font-semibold tracking-[0.18em] text-teal-600 uppercase dark:text-teal-400">
-          Phiên tư vấn
+          {t("consultationSession")}
         </p>
         <h2 className="text-xl font-semibold text-slate-800 md:text-2xl dark:text-slate-100">
-          Hội thoại
+          {t("conversation")}
         </h2>
       </header>
 
@@ -36,7 +38,7 @@ export default function ChatWindow({ messages, isThinking }) {
             </span>
             <span className="max-w-[75%] rounded-2xl rounded-bl-sm border border-teal-100 bg-white px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-800">
               <span className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-                Đang suy nghĩ
+                {t("thinkingText")}
                 <span className="thinking-dot" />
                 <span className="thinking-dot" />
                 <span className="thinking-dot" />

@@ -1,12 +1,15 @@
 import { Activity, Droplets, HeartPulse } from "lucide-react";
-
-const metrics = [
-  { icon: Droplets, label: "eGFR", value: "72", unit: "mL/min", hint: "Trung bình" },
-  { icon: Activity, label: "Creatinine", value: "1.1", unit: "mg/dL", hint: "Ổn định" },
-  { icon: HeartPulse, label: "Huyết áp", value: "120/80", unit: "mmHg", hint: "Bình thường" },
-];
+import { useLanguage } from "../../contexts/LanguageContext";
 
 export default function HealthSnapshot() {
+  const { t } = useLanguage();
+
+  const metrics = [
+    { icon: Droplets, label: "eGFR", value: "72", unit: "mL/min", hint: t("average") },
+    { icon: Activity, label: "Creatinine", value: "1.1", unit: "mg/dL", hint: t("stable") },
+    { icon: HeartPulse, label: t("bloodPressure"), value: "120/80", unit: "mmHg", hint: t("normal") },
+  ];
+
   return (
     <div className="grid grid-cols-3 gap-2">
       {metrics.map(({ icon: Icon, label, value, unit, hint }) => (

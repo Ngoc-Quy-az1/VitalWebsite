@@ -1,35 +1,66 @@
-const API_BASE_URL = (import.meta.env.VITE_CHATBOT_API_BASE_URL || "").trim();
-
-function resolveUrl(path) {
-  if (API_BASE_URL) {
-    return `${API_BASE_URL.replace(/\/+$/, "")}${path}`;
+async function refreshTokensDirectly() {
+  const refreshToken = localStorage.getItem("refreshToken");
+  if (!refreshToken) {
+    throw new Error("No refresh token");
   }
-  return `/api${path}`;
+  const response = await fetch("/auth-api/auth/refresh", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ refreshToken }),
+  });
+  if (!response.ok) {
+    localStorage.removeItem("token");
+    localStorage.removeItem("refreshToken");
+    window.dispatchEvent(new Event("auth-logout"));
+    throw new Error("Session expired. Please log in again.");
+  }
+  const data = await response.json();
+  localStorage.setItem("token", data.token);
+  if (data.refreshToken) {
+    localStorage.setItem("refreshToken", data.refreshToken);
+  }
+  return data.token;
 }
 
-async function explainApiMisconfiguration(status) {
-  if (status !== 404) {
-    return null;
+export async function fetchWithAuth(url, options = {}) {
+  let token = localStorage.getItem("token");
+  
+  const headers = { ...(options.headers || {}) };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
   }
-  try {
-    const healthRes = await fetch(resolveUrl("/health"));
-    if (!healthRes.ok) {
-      return "Không kết nối được chatbot API (cổng 8000). Chạy: .\\scripts\\run_chatbot_api.ps1 trong VitalAI.";
-    }
-    const health = await healthRes.json();
-    if (health?.service === "vitalai-medical-tools") {
-      return (
-        "Cổng 8000 đang chạy medical_tools (sai). Dừng lệnh uvicorn medical_tools trên cổng 8000, " +
-        "chạy medical_tools trên 8010 (.\\scripts\\run_medical_tools.ps1) và chatbot trên 8000 (.\\scripts\\run_chatbot_api.ps1)."
-      );
-    }
-    if (health?.service !== "vitalai-chatbot-api") {
-      return `API /health trả service không mong đợi: ${health?.service ?? "unknown"}.`;
-    }
-  } catch {
-    return "Không kết nối được chatbot API. Kiểm tra backend VitalAI đang chạy trên cổng 8000.";
+  
+  if (options.body && options.body instanceof FormData) {
+    delete headers["Content-Type"];
+  } else if (!headers["Content-Type"] && (!options.method || options.method === "POST" || options.method === "PUT")) {
+    headers["Content-Type"] = "application/json";
   }
-  return null;
+
+  const finalOptions = { ...options, headers };
+  let response = await fetch(url, finalOptions);
+
+  if (response.status === 401) {
+    try {
+      const newToken = await refreshTokensDirectly();
+      headers["Authorization"] = `Bearer ${newToken}`;
+      
+      // For FormData we must not set manual Content-Type boundary
+      const retryHeaders = { ...headers };
+      if (options.body && options.body instanceof FormData) {
+        delete retryHeaders["Content-Type"];
+      }
+      
+      const retryOptions = { ...options, headers: retryHeaders };
+      response = await fetch(url, retryOptions);
+    } catch (refreshError) {
+      console.error("Token refresh failed:", refreshError);
+      throw new Error("Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.");
+    }
+  }
+
+  return response;
 }
 
 export async function askChatbot({
@@ -42,6 +73,7 @@ export async function askChatbot({
   biomarker = null,
   timeoutMs = 90000,
   maxRetries = 1,
+  sessionId = null,
 }) {
   let response = null;
   let attempt = 0;
@@ -49,11 +81,9 @@ export async function askChatbot({
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      response = await fetch(resolveUrl("/chat/answer"), {
+      response = await fetchWithAuth("/auth-api/ai/1", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: {},
         signal: controller.signal,
         body: JSON.stringify({
           query,
@@ -63,6 +93,7 @@ export async function askChatbot({
           section_type: sectionType,
           source_type: sourceType,
           biomarker,
+          session_id: sessionId,
         }),
       });
       break;
@@ -85,10 +116,6 @@ export async function askChatbot({
   }
 
   if (!response.ok) {
-    const misconfig = await explainApiMisconfiguration(response.status);
-    if (misconfig) {
-      throw new Error(misconfig);
-    }
     let detail = `HTTP ${response.status}`;
     try {
       const data = await response.json();
@@ -113,17 +140,15 @@ export async function streamChatbot({
   onToken = () => {},
   onDone = () => {},
   timeoutMs = 90000,
+  sessionId = null,
 }) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   let response;
 
   try {
-    response = await fetch(resolveUrl("/chat/stream"), {
+    response = await fetchWithAuth("/auth-api/ai/2", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
       signal: controller.signal,
       body: JSON.stringify({
         query,
@@ -133,6 +158,7 @@ export async function streamChatbot({
         section_type: sectionType,
         source_type: sourceType,
         biomarker,
+        session_id: sessionId,
       }),
     });
   } catch (error) {
@@ -219,11 +245,8 @@ export async function streamChatbot({
 }
 
 export async function prepareTtsText({ text }) {
-  const response = await fetch(resolveUrl("/voice/tts/prepare"), {
+  const response = await fetchWithAuth("/auth-api/ai/3", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
     body: JSON.stringify({ text }),
   });
   if (!response.ok) {
@@ -239,6 +262,24 @@ export async function prepareTtsText({ text }) {
   return response.json();
 }
 
+export async function voiceStt({ audio_base64, language = 'vi' }) {
+  const response = await fetchWithAuth('/auth-api/ai/6', {
+    method: 'POST',
+    body: JSON.stringify({ audio_base64, language }),
+  });
+  if (!response.ok) {
+    let detail = `HTTP ${response.status}`;
+    try {
+      const data = await response.json();
+      detail = data?.detail || detail;
+    } catch {
+      // fallback
+    }
+    throw new Error(detail);
+  }
+  return response.json();
+}
+
 export async function analyzeHealthReportImage({ file, language = "vi", patientId = null }) {
   const formData = new FormData();
   formData.append("file", file);
@@ -247,7 +288,7 @@ export async function analyzeHealthReportImage({ file, language = "vi", patientI
     formData.append("patient_id", patientId);
   }
 
-  const response = await fetch(resolveUrl("/health-report/analyze-image"), {
+  const response = await fetchWithAuth("/auth-api/ai/4", {
     method: "POST",
     body: formData,
   });
@@ -273,6 +314,7 @@ export async function analyzeAndAnswerHealthReportImage({
   patientId = null,
   topK = 5,
   timeoutMs = 300000,
+  sessionId = null,
 }) {
   const formData = new FormData();
   formData.append("file", file);
@@ -282,12 +324,15 @@ export async function analyzeAndAnswerHealthReportImage({
   if (patientId) {
     formData.append("patient_id", patientId);
   }
+  if (sessionId) {
+    formData.append("session_id", sessionId);
+  }
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   let response;
   try {
-    response = await fetch(resolveUrl("/health-report/analyze-and-answer"), {
+    response = await fetchWithAuth("/auth-api/ai/5", {
       method: "POST",
       body: formData,
       signal: controller.signal,
@@ -313,3 +358,4 @@ export async function analyzeAndAnswerHealthReportImage({
   }
   return response.json();
 }
+

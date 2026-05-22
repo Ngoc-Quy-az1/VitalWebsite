@@ -1,14 +1,15 @@
 import {
-  ChevronLeft,
-  ChevronRight,
+  PanelLeftClose,
+  PanelLeft,
   Plus,
   Sparkles,
 } from "lucide-react";
 import UserProfileSection from "../profile/UserProfileSection";
+import { useLanguage } from "../../contexts/LanguageContext";
 
-const quickActions = [
-  { label: "Cuộc trò chuyện mới", icon: Plus },
-  { label: "Tài nguyên", icon: Sparkles },
+const getQuickActions = (t) => [
+  { label: t("newChat"), icon: Plus },
+  { label: t("resources"), icon: Sparkles },
 ];
 
 export default function ChatHistorySidebar({
@@ -22,40 +23,51 @@ export default function ChatHistorySidebar({
   onToggleTheme,
   onSetDark,
   userEmail = "quydang16012004@gmail.com",
+  onNavigateUpgrade,
+  customPlan,
+  onUpgradeSuccess,
 }) {
+  const { t } = useLanguage();
   const railButtonClass =
-    "flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-teal-700 dark:hover:bg-teal-950/60 dark:hover:text-teal-300";
+    "flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200";
+
+  const quickActions = getQuickActions(t);
+  const visibleRecentChats = recentChats.filter(
+    (chat) => chat?.title?.trim() !== "Cuộc trò chuyện mới"
+  );
 
   return (
     <aside
+      data-tour="sidebar"
       className={`flex h-full min-h-0 flex-col border border-slate-200/80 bg-white/80 shadow-lg shadow-slate-200/50 backdrop-blur transition-all duration-300 dark:border-slate-700 dark:bg-slate-900/80 dark:shadow-black/20 sm:rounded-none sm:border-y-0 sm:shadow-none ${
         collapsed
-          ? "w-[88px] overflow-visible p-2 sm:border-l-0"
-          : "overflow-visible p-4 sm:border-l-0"
+          ? "w-[60px] overflow-visible p-2.5 sm:border-l-0"
+          : "w-[320px] overflow-visible p-4 sm:border-l-0"
       }`}
     >
       {collapsed ? (
-        <div className="flex h-full min-h-0 flex-col">
+        <div className="flex h-full min-h-0 flex-col items-center">
           <button
             type="button"
             onClick={onToggleCollapsed}
-            className="mb-3 inline-flex h-10 w-10 shrink-0 items-center justify-center self-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-teal-700 dark:hover:bg-teal-950/60 dark:hover:text-teal-300"
+            className="mb-4 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
             aria-label="Mở rộng khung lịch sử chat"
             aria-expanded={false}
+            title="Mở thanh bên"
           >
-            <ChevronRight size={18} />
+            <PanelLeft size={18} />
           </button>
 
           <div className="flex flex-col items-center gap-2">
             {quickActions.map((item) => {
               const Icon = item.icon;
-              const isPrimaryAction = item.label === "Cuộc trò chuyện mới";
+              const isPrimaryAction = item.label === t("newChat");
               return (
                 <button
                   key={item.label}
                   type="button"
                   onClick={isPrimaryAction ? onNewChat : undefined}
-                  className={`${railButtonClass} ${isPrimaryAction ? "bg-slate-100 dark:bg-slate-800" : ""}`}
+                  className={railButtonClass}
                   aria-label={item.label}
                   title={item.label}
                 >
@@ -69,73 +81,73 @@ export default function ChatHistorySidebar({
             rail={collapsed}
             isDark={isDark}
             onToggleTheme={onToggleTheme}
+            onNavigateUpgrade={onNavigateUpgrade}
+            customPlan={customPlan}
+            onUpgradeSuccess={onUpgradeSuccess}
             className="mt-auto shrink-0 self-center pt-2"
           />
         </div>
       ) : (
         <div className="flex h-full min-h-0 flex-col">
-          <div className="mb-4 flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 pb-4 dark:border-slate-800">
+          <div className="mb-4 flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 pb-3 dark:border-slate-800/60">
             <div>
-              <h2 className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-100">
-                VitalWebsite
+              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <span className="bg-gradient-to-r from-teal-600 to-cyan-500 bg-clip-text text-transparent">
+                  {t("sidebarTitle")}
+                </span>
               </h2>
             </div>
             <button
               type="button"
               onClick={onToggleCollapsed}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-teal-700 dark:hover:bg-teal-950/60 dark:hover:text-teal-300"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
               aria-label="Thu gọn khung lịch sử chat"
               aria-expanded={true}
+              title="Đóng thanh bên"
             >
-              <ChevronLeft size={18} />
+              <PanelLeftClose size={18} />
             </button>
           </div>
 
-          <nav className="shrink-0 space-y-1.5">
+          <nav className="shrink-0 space-y-0.5">
             {quickActions.map((item) => {
               const Icon = item.icon;
-              const isPrimaryAction = item.label === "Cuộc trò chuyện mới";
+              const isPrimaryAction = item.label === t("newChat");
 
               return (
                 <button
                   key={item.label}
                   type="button"
                   onClick={isPrimaryAction ? onNewChat : undefined}
-                  className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-[0.98rem] transition ${
-                    isPrimaryAction
-                      ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100"
-                      : "text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800/70"
-                  }`}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-all duration-200 text-slate-700 hover:bg-slate-100/70 dark:text-slate-300 dark:hover:bg-slate-800/50"
                 >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                    <Icon size={18} />
-                  </span>
-                  <span className="font-medium">{item.label}</span>
+                  <Icon size={16} className="text-slate-500 dark:text-slate-400" />
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">{item.label}</span>
                 </button>
               );
             })}
           </nav>
 
           <div className="mt-6 flex min-h-0 flex-1 flex-col">
-            <p className="mb-3 shrink-0 text-sm font-medium text-slate-500 dark:text-slate-400">Gần đây</p>
-            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-              {recentChats.map((chat) => {
+            <p className="mb-2 shrink-0 px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              {t("recent")}
+            </p>
+            <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto pr-1">
+              {visibleRecentChats.map((chat) => {
                 const isActive = chat.id === activeChatId;
                 return (
                   <button
                     key={chat.id}
                     type="button"
                     onClick={() => onSelectChat?.(chat.id)}
-                    className={`w-full rounded-2xl border px-3 py-3 text-left transition ${
+                    className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-all duration-200 truncate ${
                       isActive
-                        ? "border-teal-200 bg-teal-50 text-slate-900 shadow-sm dark:border-teal-800 dark:bg-teal-950/40 dark:text-slate-100"
-                        : "border-transparent bg-slate-50 text-slate-700 hover:border-slate-200 hover:bg-white dark:bg-slate-800/60 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-800"
+                        ? "bg-slate-150 text-slate-900 font-semibold dark:bg-slate-800 dark:text-slate-100"
+                        : "text-slate-700 hover:bg-slate-100/70 dark:text-slate-300 dark:hover:bg-slate-800/50"
                     }`}
+                    title={chat.title}
                   >
-                    <p className="truncate text-[0.98rem] font-medium">{chat.title}</p>
-                    <p className="mt-1 truncate text-sm text-slate-500 dark:text-slate-400">
-                      {chat.preview}
-                    </p>
+                    <span className="block truncate">{chat.title}</span>
                   </button>
                 );
               })}
@@ -146,10 +158,14 @@ export default function ChatHistorySidebar({
             rail={false}
             isDark={isDark}
             onToggleTheme={onToggleTheme}
-            className="mt-auto flex w-full shrink-0 justify-center border-t border-slate-100 pt-3 dark:border-slate-800"
+            onNavigateUpgrade={onNavigateUpgrade}
+            customPlan={customPlan}
+            onUpgradeSuccess={onUpgradeSuccess}
+            className="mt-auto flex w-full shrink-0 justify-center border-t border-slate-100 pt-3 dark:border-slate-800/60"
           />
         </div>
       )}
     </aside>
   );
 }
+

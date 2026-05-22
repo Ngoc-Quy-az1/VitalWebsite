@@ -1,12 +1,13 @@
 import { BrainCircuit, Mic, Volume2 } from "lucide-react";
 import HealthSnapshot from "./HealthSnapshot";
 import VoiceVisualizer from "./VoiceVisualizer";
+import { useLanguage } from "../../contexts/LanguageContext";
 
-function getStatusLabel({ isListening, isSpeaking, isThinking }) {
-  if (isThinking) return "Đang phân tích";
-  if (isSpeaking) return "Đang nói";
-  if (isListening) return "Đang nghe";
-  return "Sẵn sàng";
+function getStatusLabel({ isListening, isSpeaking, isThinking, t }) {
+  if (isThinking) return t("thinking");
+  if (isSpeaking) return t("speaking");
+  if (isListening) return t("listening");
+  return t("ready");
 }
 
 function getVisualizerVariant({ isListening, isSpeaking, isThinking }) {
@@ -23,7 +24,8 @@ export default function VirtualAvatarPanel({
   onStopSpeaking,
   compact = false,
 }) {
-  const status = getStatusLabel({ isListening, isSpeaking, isThinking });
+  const { t, language } = useLanguage();
+  const status = getStatusLabel({ isListening, isSpeaking, isThinking, t });
   const visualizerActive = isListening || isSpeaking || isThinking;
   const visualizerVariant = getVisualizerVariant({ isListening, isSpeaking, isThinking });
 
@@ -32,7 +34,7 @@ export default function VirtualAvatarPanel({
       <div className="mb-3 flex items-center justify-between gap-2">
         <div>
           <p className="text-xs font-semibold tracking-[0.2em] text-teal-600 uppercase dark:text-teal-400">
-            Trợ lý ảo
+            {t("assistantTitle")}
           </p>
           <h2 className="text-lg font-semibold text-slate-800 md:text-xl dark:text-slate-100">
             KidneyCare AI
@@ -46,16 +48,14 @@ export default function VirtualAvatarPanel({
       {!compact && (
         <div className="mb-3">
           <p className="mb-2 text-xs font-medium text-slate-500 dark:text-slate-400">
-            Chỉ số tham khảo 
+            {t("healthSnapshot")}
           </p>
           <HealthSnapshot />
         </div>
       )}
 
       <div
-        className={`relative flex flex-1 items-center justify-center overflow-hidden rounded-2xl border border-cyan-100 bg-gradient-to-b from-cyan-50 to-sky-100/70 dark:border-slate-700 dark:from-slate-800 dark:to-slate-900 ${
-          compact ? "min-h-[200px]" : "min-h-[220px]"
-        }`}
+        className={`relative flex flex-1 items-center justify-center overflow-hidden rounded-2xl border border-cyan-100 bg-gradient-to-b from-cyan-50 to-sky-100/70 dark:border-slate-700 dark:from-slate-800 dark:to-slate-900 ${compact ? "min-h-[200px]" : "min-h-[220px]"}`}
       >
         {isListening && (
           <div className="listening-ring absolute inset-10 rounded-full border-2 border-teal-300 dark:border-teal-600" />
@@ -74,7 +74,7 @@ export default function VirtualAvatarPanel({
 
         <div className="absolute bottom-3 left-1/2 z-20 w-[85%] max-w-xs -translate-x-1/2 rounded-xl bg-white/90 px-3 py-2 shadow dark:bg-slate-900/90">
           <p className="mb-1 text-center text-[10px] font-medium text-slate-500 dark:text-slate-400">
-            {isSpeaking ? "Đang phát âm thanh" : isListening ? "Đang lắng nghe" : isThinking ? "Đang xử lý" : "Chờ tương tác"}
+            {isSpeaking ? t("speaking") : isListening ? t("listening") : isThinking ? t("thinking") : t("waitingInteraction")}
           </p>
           <VoiceVisualizer active={visualizerActive} variant={visualizerVariant} />
         </div>
@@ -82,14 +82,14 @@ export default function VirtualAvatarPanel({
         {isThinking && (
           <div className="absolute top-3 right-3 flex items-center gap-2 rounded-xl bg-slate-900/85 px-2.5 py-1.5 text-xs text-white">
             <BrainCircuit size={14} className="animate-pulse" />
-            Đang quét dữ liệu...
+            {t("scanningData")}
           </div>
         )}
 
         {isListening && (
           <div className="absolute top-3 left-3 flex items-center gap-1.5 rounded-xl bg-teal-600/90 px-2.5 py-1.5 text-xs text-white">
             <Mic size={14} />
-            Ghi âm
+            {t("voiceVisualizerText")}
           </div>
         )}
 
@@ -100,11 +100,10 @@ export default function VirtualAvatarPanel({
             className="absolute right-3 bottom-3 z-30 flex items-center gap-1.5 rounded-xl bg-rose-500 px-2.5 py-1.5 text-xs font-medium text-white shadow transition hover:bg-rose-600"
           >
             <Volume2 size={14} />
-            Dừng đọc
+            {t("stopSpeaking")}
           </button>
         )}
       </div>
     </section>
   );
 }
-

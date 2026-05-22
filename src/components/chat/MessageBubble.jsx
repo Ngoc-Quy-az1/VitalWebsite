@@ -41,6 +41,18 @@ export default function MessageBubble({ message }) {
               : "bg-white border border-teal-50 text-slate-800 rounded-tl-none"
           )}
         >
+          {Array.isArray(message.imagePreviews) && message.imagePreviews.length > 0 ? (
+            <div className="mb-3">
+              <div className="flex gap-3 overflow-x-auto py-1">
+                {message.imagePreviews.map((src, i) => (
+                  <div key={i} className="w-56 h-40 rounded-2xl overflow-hidden border bg-white">
+                    <img src={src} alt={`msg-img-${i}`} className="w-full h-full object-cover" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           <div className="prose prose-sm md:prose-base prose-slate max-w-none">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {message.content}

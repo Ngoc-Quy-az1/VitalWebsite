@@ -37,9 +37,11 @@ function MenuPanel({
   userName,
   userPlan,
   userInitials,
+  language = "VI",
   onThemeChange,
   onNavigate,
   className,
+  rail,
 }) {
   const handleItemClick = (action) => () => {
     onNavigate?.(action);
@@ -48,6 +50,34 @@ function MenuPanel({
   const setTheme = (nextDark) => {
     if (nextDark !== isDark) onThemeChange?.();
   };
+
+  // Switchable translations
+  const t = {
+    VI: {
+      profile: "Hồ sơ",
+      settings: "Cài đặt",
+      theme: "Giao diện",
+      light: "Sáng",
+      dark: "Tối",
+      language: "Ngôn ngữ",
+      help: "Trợ giúp",
+      upgrade: "Nâng cấp gói",
+      logout: "Đăng xuất",
+      proBadge: "Pro",
+    },
+    EN: {
+      profile: "Profile",
+      settings: "Settings",
+      theme: "Interface",
+      light: "Light",
+      dark: "Dark",
+      language: "Language",
+      help: "Help",
+      upgrade: "Upgrade Plan",
+      logout: "Log out",
+      proBadge: "Pro",
+    },
+  }[language || "VI"];
 
   return (
     <motion.div
@@ -60,7 +90,8 @@ function MenuPanel({
       exit="exit"
       style={{ transformOrigin: "bottom center" }}
       className={cn(
-        "w-[220px] overflow-hidden rounded-2xl",
+        rail ? "w-[240px]" : "w-full",
+        "overflow-hidden rounded-2xl",
         "border border-slate-200/80 bg-white p-1.5 shadow-[0_8px_32px_rgba(15,23,42,0.12)]",
         "dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_12px_40px_rgba(0,0,0,0.4)]",
         className
@@ -68,17 +99,19 @@ function MenuPanel({
     >
       <button
         type="button"
-        onClick={handleItemClick("account")}
+        onClick={handleItemClick("profile")}
         className="flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left transition hover:bg-slate-50 dark:hover:bg-slate-800/60"
       >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-800 text-[11px] font-semibold text-white dark:bg-slate-200 dark:text-slate-900">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-800 text-[11px] font-semibold text-white dark:bg-slate-200 dark:text-slate-900 animate-pulse">
           {userInitials}
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-semibold leading-tight text-slate-900 dark:text-slate-100">
             {userName}
           </span>
-          <span className="block truncate text-[11px] text-slate-500 dark:text-slate-400">{userPlan}</span>
+          <span className="block truncate text-[11px] font-semibold text-teal-600 dark:text-teal-400">
+            {userPlan}
+          </span>
         </span>
         <ChevronRight size={14} className="shrink-0 text-slate-400" strokeWidth={2} />
       </button>
@@ -89,21 +122,21 @@ function MenuPanel({
         <DropdownMenuItem
           role="menuitem"
           icon={UserRound}
-          label="Hồ sơ"
+          label={t.profile}
           className={compactItemClass}
           onClick={handleItemClick("profile")}
         />
         <DropdownMenuItem
           role="menuitem"
           icon={Settings2}
-          label="Cài đặt"
+          label={t.settings}
           className={compactItemClass}
           onClick={handleItemClick("settings")}
         />
       </div>
 
       <div className="px-2 py-1.5" role="none">
-        <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">Giao diện</p>
+        <p className="mb-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">{t.theme}</p>
         <ThemeToggleSwitch isDark={isDark} onChange={setTheme} className="h-8" />
       </div>
 
@@ -113,15 +146,15 @@ function MenuPanel({
         <DropdownMenuItem
           role="menuitem"
           icon={Globe2}
-          label="Ngôn ngữ"
+          label={t.language}
           className={compactItemClass}
-          trailing={<span className="text-[11px] font-medium">VI</span>}
+          trailing={<span className="text-[11px] font-extrabold text-teal-600 dark:text-teal-400">{language}</span>}
           onClick={handleItemClick("language")}
         />
         <DropdownMenuItem
           role="menuitem"
           icon={HelpCircle}
-          label="Trợ giúp"
+          label={t.help}
           className={compactItemClass}
           trailing={<ChevronRight size={14} className="text-slate-400" strokeWidth={2} />}
           onClick={handleItemClick("help")}
@@ -129,11 +162,11 @@ function MenuPanel({
         <DropdownMenuItem
           role="menuitem"
           icon={Crown}
-          label="Nâng cấp gói"
+          label={t.upgrade}
           className={compactItemClass}
           trailing={
-            <span className="rounded-md bg-teal-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-teal-700 dark:bg-teal-950/50 dark:text-teal-300">
-              Pro
+            <span className="rounded-md bg-teal-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-teal-700 dark:bg-teal-950/50 dark:text-teal-300">
+              {t.proBadge}
             </span>
           }
           onClick={handleItemClick("upgrade")}
@@ -145,7 +178,7 @@ function MenuPanel({
       <DropdownMenuItem
         role="menuitem"
         icon={LogOut}
-        label="Đăng xuất"
+        label={t.logout}
         variant="danger"
         className={compactItemClass}
         trailing={<ChevronRight size={14} className="text-rose-400" strokeWidth={2} />}
@@ -165,6 +198,8 @@ export default function ProfileDropdown({
   userName = "Ngọc Quý",
   userPlan = "Free",
   userInitials = "NQ",
+  language = "VI",
+  rail = false,
   className,
   onNavigate,
 }) {
@@ -176,6 +211,8 @@ export default function ProfileDropdown({
     userName,
     userPlan,
     userInitials,
+    language,
+    rail,
     onThemeChange,
     onNavigate,
     className,
@@ -185,7 +222,7 @@ export default function ProfileDropdown({
     <>
       <AnimatePresence>
         {isOpen && !usePortal ? (
-          <div className="absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2">
+          <div className="absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 w-[calc(100%-8px)]">
             <MenuPanel {...panelProps} />
           </div>
         ) : null}
