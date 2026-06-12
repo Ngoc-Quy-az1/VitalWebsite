@@ -28,6 +28,7 @@ export default function BottomInputArea({
   onRemoveImage,
   quickReplies,
   onQuickReply,
+  onStopGeneration,
 }) {
   const { t } = useLanguage();
   const voiceEnabled = interactionMode === "voice";
@@ -171,19 +172,31 @@ export default function BottomInputArea({
             )}
           </button>
 
-          <button
-            type="button"
-            onClick={() => onSendMessage()}
-            disabled={!canSend}
-            aria-label={t("sendMessage")}
-            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition ${
-              canSend
-                ? "bg-teal-600 text-white shadow-md hover:bg-teal-700"
-                : "cursor-not-allowed bg-teal-100 text-teal-300 dark:bg-slate-700 dark:text-slate-500"
-            }`}
-          >
-            <ArrowUp size={20} strokeWidth={2.5} />
-          </button>
+          {isThinking ? (
+            <button
+              type="button"
+              onClick={onStopGeneration}
+              aria-label="Dừng tạo câu trả lời"
+              title="Dừng tạo câu trả lời"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-rose-500 text-white shadow-md hover:bg-rose-600 transition"
+            >
+              <Square size={16} className="fill-white" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onSendMessage()}
+              disabled={!canSend}
+              aria-label={t("sendMessage")}
+              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition ${
+                canSend
+                  ? "bg-teal-600 text-white shadow-md hover:bg-teal-700"
+                  : "cursor-not-allowed bg-teal-100 text-teal-300 dark:bg-slate-700 dark:text-slate-500"
+              }`}
+            >
+              <ArrowUp size={20} strokeWidth={2.5} />
+            </button>
+          )}
         </footer>
       </article>
 

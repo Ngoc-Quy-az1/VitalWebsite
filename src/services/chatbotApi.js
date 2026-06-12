@@ -1,9 +1,21 @@
+export function getApiUrl(path) {
+  let baseUrl = import.meta.env.VITE_CHATBOT_API_BASE_URL || "";
+  if (baseUrl) {
+    if (baseUrl.endsWith("/")) {
+      baseUrl = baseUrl.slice(0, -1);
+    }
+    const apiPath = path.startsWith("/auth-api") ? path.replace(/^\/auth-api/, "/api") : path;
+    return `${baseUrl}${apiPath}`;
+  }
+  return path;
+}
+
 async function refreshTokensDirectly() {
   const refreshToken = localStorage.getItem("refreshToken");
   if (!refreshToken) {
     throw new Error("No refresh token");
   }
-  const response = await fetch("/auth-api/auth/refresh", {
+  const response = await fetch(getApiUrl("/auth-api/auth/refresh"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -39,7 +51,7 @@ export async function fetchWithAuth(url, options = {}) {
   }
 
   const finalOptions = { ...options, headers };
-  let response = await fetch(url, finalOptions);
+  let response = await fetch(getApiUrl(url), finalOptions);
 
   if (response.status === 401) {
     try {
@@ -53,7 +65,7 @@ export async function fetchWithAuth(url, options = {}) {
       }
       
       const retryOptions = { ...options, headers: retryHeaders };
-      response = await fetch(url, retryOptions);
+      response = await fetch(getApiUrl(url), retryOptions);
     } catch (refreshError) {
       console.error("Token refresh failed:", refreshError);
       throw new Error("Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.");
@@ -141,6 +153,7 @@ export async function streamChatbot({
   onDone = () => {},
   timeoutMs = 90000,
   sessionId = null,
+  signal = null,
 }) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -149,7 +162,7 @@ export async function streamChatbot({
   try {
     response = await fetchWithAuth("/auth-api/ai/2", {
       method: "POST",
-      signal: controller.signal,
+      signal: signal || controller.signal,
       body: JSON.stringify({
         query,
         top_k: topK,
@@ -315,6 +328,7 @@ export async function analyzeAndAnswerHealthReportImage({
   topK = 5,
   timeoutMs = 300000,
   sessionId = null,
+  signal = null,
 }) {
   const formData = new FormData();
   formData.append("file", file);
@@ -335,7 +349,7 @@ export async function analyzeAndAnswerHealthReportImage({
     response = await fetchWithAuth("/auth-api/ai/5", {
       method: "POST",
       body: formData,
-      signal: controller.signal,
+      signal: signal || controller.signal,
     });
   } catch (error) {
     if (error?.name === "AbortError") {

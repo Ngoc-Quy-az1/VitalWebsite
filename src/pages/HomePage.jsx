@@ -87,6 +87,7 @@ export default function HomePage() {
   const autoSubmitVoiceRef = useRef(false);
   const sendLockRef = useRef(false);
   const lastSentRef = useRef({ text: "", ts: 0 });
+  const activeAbortControllerRef = useRef(null);
 
   const refreshSessionsList = async (targetActiveId = null) => {
     try {
@@ -540,55 +541,18 @@ export default function HomePage() {
     const files = Array.from(event.target.files || []);
     if (!files.length) return;
 
-    // Ensure we have an active session to attach files to
-    const ensureSession = async () => {
-      if (!activeChatId) {
-        const s = await createNewSession();
-        return s?.id;
-      }
-      return activeChatId;
-    };
-
-    const newItems = files.map((file) => ({ file, preview: URL.createObjectURL(file), uploading: true }));
+    const newItems = files.map((file) => ({ file, preview: URL.createObjectURL(file), uploading: false }));
     setPendingImages((prev) => [...prev, ...newItems]);
-    setIsThinking(true);
+    event.target.value = null;
+  };
 
-    (async () => {
-      try {
-        const sessionId = await ensureSession();
-        for (const file of files) {
-          const form = new FormData();
-          form.append('file', file);
-          if (sessionId) form.append('session_id', sessionId);
-
-          const resp = await fetchWithAuth('/auth-api/files/upload', {
-            method: 'POST',
-            body: form,
-          });
-
-          if (!resp.ok) {
-            console.error('Upload failed:', resp.status);
-            continue;
-          }
-
-          const data = await resp.json();
-          const saved = data?.file || data;
-          const url = saved?.file_path || saved?.file?.file_path || saved?.file_path;
-
-          // Add persisted image as a user message so it shows after reload
-          if (url) {
-            addMessage({ id: `u-img-${Date.now()}`, role: 'user', content: '', imagePreviews: [url] });
-          }
-        }
-      } catch (err) {
-        console.error('Image upload error:', err);
-      } finally {
-        // cleanup previews and state
-        setPendingImages([]);
-        setIsThinking(false);
-        event.target.value = null;
-      }
-    })();
+  const handleStopGeneration = () => {
+    if (activeAbortControllerRef.current) {
+      activeAbortControllerRef.current.abort();
+      activeAbortControllerRef.current = null;
+      setIsThinking(false);
+      sendLockRef.current = false;
+    }
   };
 
   const handleRemoveImage = (index) => {
@@ -632,11 +596,28 @@ export default function HomePage() {
     setIsListening(false);
     setIsThinking(true);
 
+    activeAbortControllerRef.current = new AbortController();
+
     try {
       let result;
       if (pendingImagesForMessage?.length) {
-        // For analysis we send the first image file to the backend. UI retains multiple previews.
+        // Asynchronously upload the image to the chat history first
         const firstFile = pendingImagesForMessage[0].file;
+        try {
+          const form = new FormData();
+          form.append('file', firstFile);
+          if (activeChatId) form.append('session_id', activeChatId);
+
+          await fetchWithAuth('/auth-api/files/upload', {
+            method: 'POST',
+            body: form,
+            signal: activeAbortControllerRef.current?.signal,
+          });
+        } catch (uploadErr) {
+          console.error('Image history save error:', uploadErr);
+        }
+
+        // Call analysis tool
         result = await analyzeAndAnswerHealthReportImage({
           file: firstFile,
           question: userText || "Phân tích ảnh đã tải lên",
@@ -644,6 +625,7 @@ export default function HomePage() {
           patientId: null,
           topK: 5,
           sessionId: activeChatId,
+          signal: activeAbortControllerRef.current?.signal,
         });
       } else {
         const assistantMessageId = `a-${Date.now()}`;
@@ -671,6 +653,7 @@ export default function HomePage() {
           topK: 5,
           includeDebug: false,
           sessionId: activeChatId,
+          signal: activeAbortControllerRef.current?.signal,
           onToken: (token) => {
             streamedAnswer += token;
             if (!hasStartedStreaming) {
@@ -721,17 +704,26 @@ export default function HomePage() {
         }
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Lỗi không xác định";
-      setApiError(message);
-      addMessage({
-        id: `a-${Date.now()}`,
-        role: "assistant",
-        content: `Không xử lý được yêu cầu: ${message}`,
-      });
+      if (error instanceof Error && error.name === "AbortError") {
+        addMessage({
+          id: `a-${Date.now()}`,
+          role: "assistant",
+          content: "Đã dừng tạo câu trả lời.",
+        });
+      } else {
+        const message = error instanceof Error ? error.message : "Lỗi không xác định";
+        setApiError(message);
+        addMessage({
+          id: `a-${Date.now()}`,
+          role: "assistant",
+          content: `Không xử lý được yêu cầu: ${message}`,
+        });
+      }
       setIsSpeaking(false);
     } finally {
       setIsThinking(false);
       sendLockRef.current = false;
+      activeAbortControllerRef.current = null;
     }
   };
 
@@ -866,6 +858,7 @@ export default function HomePage() {
                   onRemoveImage={handleRemoveImage}
                   quickReplies={getTranslatedQuickReplies()}
                   onQuickReply={handleQuickReply}
+                  onStopGeneration={handleStopGeneration}
                 />
               </div>
             </>

@@ -8,14 +8,19 @@ import {
   Star,
   ShieldCheck,
   HeartPulse,
+  ArrowLeft,
+  CreditCard,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLanguage } from "../../contexts/LanguageContext";
+import { useAuth } from "../../contexts/AuthContext";
 
 export default function UpgradePage({ onBack, onUpgradeSuccess, currentPlan }) {
   const { language } = useLanguage();
+  const { user } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [showQR, setShowQR] = useState(false);
 
   const localT =
     {
@@ -36,11 +41,20 @@ export default function UpgradePage({ onBack, onUpgradeSuccess, currentPlan }) {
           "Tối ưu hóa tuyệt đối sức khỏe thận của bạn bằng công nghệ hiện đại nhất.",
         active: "Gói của bạn",
         upgradeNow: "Nâng cấp ngay",
-        processing: "Đang tiến hành giao dịch an toàn...",
+        processing: "Đang kiểm tra và xác nhận chuyển khoản...",
         successTitle: "Tuyệt vời! Giao dịch thành công!",
         successDesc:
           "Hệ thống đã nâng cấp tài khoản của bạn lên gói Premium Pro. Bạn đã sở hữu toàn bộ đặc quyền cao cấp ngay từ bây giờ.",
         successBtn: "Khám phá ngay",
+        paymentTitle: "Thanh toán gói Premium Pro",
+        paymentSubtitle: "Quét mã QR dưới đây hoặc chuyển khoản thủ công",
+        bankName: "Ngân hàng",
+        accountNum: "Số tài khoản",
+        accountName: "Chủ tài khoản",
+        amount: "Số tiền",
+        message: "Nội dung chuyển khoản",
+        paidBtn: "Tôi đã chuyển khoản",
+        backBtnPayment: "Quay lại",
         features: [
           "Chatbot AI Thận học nâng cao, phân tích eGFR, Creatinine không giới hạn",
           "Trích xuất & đọc ảnh xét nghiệm sinh hóa tự động siêu tốc",
@@ -80,6 +94,15 @@ export default function UpgradePage({ onBack, onUpgradeSuccess, currentPlan }) {
         successDesc:
           "Your account is now upgraded to Premium Pro. Enjoy your unlimited access and VIP privileges.",
         successBtn: "Start Exploring Now",
+        paymentTitle: "Premium Pro Plan Payment",
+        paymentSubtitle: "Scan QR code below or transfer manually",
+        bankName: "Bank",
+        accountNum: "Account Number",
+        accountName: "Account Owner",
+        amount: "Amount",
+        message: "Transfer Message",
+        paidBtn: "I have transferred",
+        backBtnPayment: "Back",
         features: [
           "Unlimited advanced kidney health consultations (eGFR, Creatinine)",
           "Automated biochemical lab report OCR & image analysis",
@@ -99,9 +122,26 @@ export default function UpgradePage({ onBack, onUpgradeSuccess, currentPlan }) {
       },
     }[language] || {};
 
-  const handleUpgrade = () => {
-    setIsProcessing(true);
+  // Tên người dùng chuyển khoản tự động
+  const transferName = (user?.full_name || user?.username || "Quy Dang").trim();
+  const rawTransferMsg = `VitalAI Pro ${transferName}`;
+  // Chuẩn hóa sang không dấu cho nội dung chuyển khoản ngân hàng
+  const transferMessage = rawTransferMsg
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .replace(/[^a-zA-Z0-9 ]/g, "");
 
+  const qrUrl = `https://img.vietqr.io/image/vietinbank-113000000000-compact2.png?amount=199000&addInfo=${encodeURIComponent(transferMessage)}&accountName=VitalAI`;
+
+  const handleUpgradeClick = () => {
+    setShowQR(true);
+  };
+
+  const handleConfirmPaid = () => {
+    setIsProcessing(true);
+    // Giả lập check giao dịch
     setTimeout(() => {
       setIsProcessing(false);
       setIsSuccess(true);
@@ -124,7 +164,8 @@ export default function UpgradePage({ onBack, onUpgradeSuccess, currentPlan }) {
 
       <AnimatePresence mode="wait">
         {!isSuccess ? (
-          <motion.div
+          !showQR ? (
+            <motion.div
             key="upgrade-page-form"
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
@@ -190,7 +231,7 @@ export default function UpgradePage({ onBack, onUpgradeSuccess, currentPlan }) {
                 </div>
               </div>
 
-              <div className="relative flex flex-col justify-between overflow-hidden rounded-3xl border-2 border-teal-500 bg-white p-6 shadow-lg shadow-teal-500/5 dark:bg-slate-900/90">
+              <div className="relative flex flex-col justify-between rounded-3xl border-2 border-teal-500 bg-white p-6 shadow-lg shadow-teal-500/5 dark:bg-slate-900/90">
                 <div className="absolute -top-3 right-6 flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow">
                   <Star size={11} className="fill-white" />
                   PRO
@@ -243,18 +284,10 @@ export default function UpgradePage({ onBack, onUpgradeSuccess, currentPlan }) {
                   <div className="mt-8">
                     <button
                       type="button"
-                      disabled={isProcessing}
-                      onClick={handleUpgrade}
-                      className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-teal-600 to-cyan-500 py-3.5 text-center text-xs font-bold text-white shadow-lg transition duration-200 hover:from-teal-700 hover:to-cyan-600 hover:shadow-teal-500/20 disabled:cursor-not-allowed disabled:opacity-70"
+                      onClick={handleUpgradeClick}
+                      className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-teal-600 to-cyan-500 py-3.5 text-center text-xs font-bold text-white shadow-lg transition duration-200 hover:from-teal-700 hover:to-cyan-600 hover:shadow-teal-500/20"
                     >
-                      {isProcessing ? (
-                        <>
-                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                          {localT.processing}
-                        </>
-                      ) : (
-                        localT.upgradeNow
-                      )}
+                      {localT.upgradeNow}
                     </button>
                   </div>
                 )}
@@ -283,6 +316,84 @@ export default function UpgradePage({ onBack, onUpgradeSuccess, currentPlan }) {
             </div>
           </motion.div>
         ) : (
+          <motion.div
+            key="payment-page-form"
+            initial={{ opacity: 0, scale: 0.95, y: 15 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 15 }}
+            className="mx-auto w-full max-w-md overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950 p-6 flex flex-col items-center gap-5 my-8 text-center"
+          >
+            {/* Header */}
+            <div className="flex w-full items-center gap-2 border-b border-slate-100 pb-4 dark:border-slate-850">
+              <CreditCard className="text-teal-600" size={24} />
+              <div className="text-left">
+                <h3 className="text-base font-bold text-slate-850 dark:text-slate-100">{localT.paymentTitle}</h3>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500">{localT.paymentSubtitle}</p>
+              </div>
+            </div>
+
+            {/* QR Panel */}
+            <div className="relative rounded-2xl border border-slate-100 bg-white p-2.5 shadow-md dark:border-slate-800">
+              <img
+                src={qrUrl}
+                alt="VietQR Code"
+                className="h-56 w-56 object-contain"
+              />
+            </div>
+
+            <div className="w-full space-y-2.5 rounded-2xl bg-slate-50 p-4 text-xs dark:bg-slate-900/60 text-left">
+              <div className="flex justify-between border-b border-slate-200/50 pb-2 dark:border-slate-800">
+                <span className="text-slate-400">{localT.bankName}</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">VietinBank</span>
+              </div>
+              <div className="flex justify-between border-b border-slate-200/50 pb-2 dark:border-slate-800">
+                <span className="text-slate-400">{localT.accountNum}</span>
+                <span className="font-mono font-bold text-teal-600">113000000000</span>
+              </div>
+              <div className="flex justify-between border-b border-slate-200/50 pb-2 dark:border-slate-800">
+                <span className="text-slate-400">{localT.accountName}</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">VitalAI</span>
+              </div>
+              <div className="flex justify-between border-b border-slate-200/50 pb-2 dark:border-slate-800">
+                <span className="text-slate-400">{localT.amount}</span>
+                <span className="font-bold text-rose-500">199.000 đ</span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-slate-400">{localT.message}</span>
+                <span className="rounded bg-teal-100/50 dark:bg-teal-950/40 px-2 py-1 font-mono font-bold text-teal-700 dark:text-teal-400 text-center select-all">
+                  {transferMessage}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex w-full gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowQR(false)}
+                className="flex-1 rounded-xl border border-slate-200 py-3 text-center text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-850 dark:text-slate-400 dark:hover:bg-slate-900 flex items-center justify-center gap-1.5"
+              >
+                <ArrowLeft size={14} />
+                {localT.backBtnPayment}
+              </button>
+
+              <button
+                type="button"
+                disabled={isProcessing}
+                onClick={handleConfirmPaid}
+                className="flex-2 w-full rounded-xl bg-gradient-to-r from-teal-600 to-cyan-500 py-3 text-center text-xs font-bold text-white shadow-md hover:from-teal-700 hover:to-cyan-600 transition duration-200 focus:outline-none flex items-center justify-center gap-2"
+              >
+                {isProcessing ? (
+                  <>
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    {localT.processing}
+                  </>
+                ) : (
+                  localT.paidBtn
+                )}
+              </button>
+            </div>
+          </motion.div>
+        ) ) : (
           <motion.div
             key="upgrade-page-success"
             initial={{ opacity: 0, scale: 0.95 }}

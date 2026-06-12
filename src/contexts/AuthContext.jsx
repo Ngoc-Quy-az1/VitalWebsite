@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { getApiUrl } from "../services/chatbotApi";
 
 const AuthContext = createContext(null);
 
@@ -10,7 +11,7 @@ export function AuthProvider({ children }) {
   const markFreshLogin = () => {
     try {
       sessionStorage.setItem("vital_fresh_login", "1");
-    } catch {}
+    } catch { }
   };
 
   // Fetch current profile on mount or token change
@@ -23,7 +24,7 @@ export function AuthProvider({ children }) {
       }
 
       try {
-        const response = await fetch("/auth-api/users/me", {
+        const response = await fetch(getApiUrl("/auth-api/users/me"), {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -56,7 +57,7 @@ export function AuthProvider({ children }) {
       throw new Error("No refresh token found");
     }
 
-    const response = await fetch("/auth-api/auth/refresh", {
+    const response = await fetch(getApiUrl("/auth-api/auth/refresh"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -79,7 +80,7 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     setError(null);
     try {
-      const response = await fetch("/auth-api/auth/signin", {
+      const response = await fetch(getApiUrl("/auth-api/auth/signin"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -101,7 +102,7 @@ export function AuthProvider({ children }) {
       // Notify app that a fresh login just happened
       try {
         window.dispatchEvent(new Event("auth-just-logged-in"));
-      } catch {}
+      } catch { }
       return data.user;
     } catch (err) {
       setError(err.message);
@@ -113,7 +114,7 @@ export function AuthProvider({ children }) {
   const signup = async (username, email, password, fullName) => {
     setError(null);
     try {
-      const response = await fetch("/auth-api/auth/signup", {
+      const response = await fetch(getApiUrl("/auth-api/auth/signup"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -140,7 +141,7 @@ export function AuthProvider({ children }) {
       // Notify app that a fresh signup just happened (treat like login)
       try {
         window.dispatchEvent(new Event("auth-just-logged-in"));
-      } catch {}
+      } catch { }
       return data.user;
     } catch (err) {
       setError(err.message);
@@ -152,7 +153,7 @@ export function AuthProvider({ children }) {
   const googleLogin = async (googleIdToken) => {
     setError(null);
     try {
-      const response = await fetch("/auth-api/auth/google", {
+      const response = await fetch(getApiUrl("/auth-api/auth/google"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -174,7 +175,7 @@ export function AuthProvider({ children }) {
       // Notify app that a fresh Google login just happened
       try {
         window.dispatchEvent(new Event("auth-just-logged-in"));
-      } catch {}
+      } catch { }
       return data.user;
     } catch (err) {
       setError(err.message);

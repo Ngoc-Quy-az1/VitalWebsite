@@ -109,6 +109,7 @@
 }
 
 .thinking-dot {
+  display: inline-block;
   width: 0.42rem;
   height: 0.42rem;
   border-radius: 9999px;

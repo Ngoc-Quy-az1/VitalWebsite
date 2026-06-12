@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import { X, User, Mail, Calendar, ShieldCheck, Check } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -52,7 +53,7 @@ export default function UserProfileModal({
     setTimeout(() => setIsSaved(false), 3000);
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 15 }}
@@ -160,6 +161,7 @@ export default function UserProfileModal({
           </div>
         </form>
       </motion.div>
-    </div>
+    </div>,
+    document.body
   );
 }
