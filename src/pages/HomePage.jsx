@@ -5,10 +5,13 @@ import ChatWindow from "../components/chat/ChatWindow";
 import BottomInputArea from "../components/input/BottomInputArea";
 import { QUICK_REPLIES } from "../constants/quickReplies";
 import { useTheme } from "../hooks/useTheme";
-import { analyzeAndAnswerHealthReportImage, prepareTtsText, streamChatbot, fetchWithAuth, voiceStt } from "../services/chatbotApi";
+import { analyzeAndAnswerHealthReportImage, prepareTtsText, streamChatbot, fetchWithAuth, voiceStt, deleteChatSession, pinChatSession } from "../services/chatbotApi";
 import { useLanguage } from "../contexts/LanguageContext";
 import UpgradePage from "../components/profile/UpgradePage";
 import InteractiveTour from "../components/tour/InteractiveTour";
+import { useAuth } from "../contexts/AuthContext";
+import AdminDashboard from "../components/admin/AdminDashboard";
+
 
 function pickBestVietnameseVoice(voices) {
   if (!Array.isArray(voices) || voices.length === 0) return null;
@@ -45,6 +48,12 @@ const starterMessages = [
 
 export default function HomePage() {
   const { t, language } = useLanguage();
+  const { user } = useAuth();
+
+  if (user && user.role === 'ADMIN') {
+    return <AdminDashboard />;
+  }
+
   const [activeView, setActiveView] = useState("chat"); // 'chat' or 'upgrade'
   const [customPlan, setCustomPlan] = useState(() => {
     if (typeof window !== "undefined") {
@@ -88,6 +97,7 @@ export default function HomePage() {
   const sendLockRef = useRef(false);
   const lastSentRef = useRef({ text: "", ts: 0 });
   const activeAbortControllerRef = useRef(null);
+  const pendingCreationPromiseRef = useRef(null);
 
   const refreshSessionsList = async (targetActiveId = null) => {
     try {
@@ -248,11 +258,17 @@ export default function HomePage() {
     setInputValue("");
     setPendingImages([]);
     setApiError("");
-    const newSession = await createNewSession("Cuộc trò chuyện mới");
 
-    if (!newSession?.id) {
-      return;
-    }
+    const tempId = `temp-${Date.now()}`;
+    const tempSession = {
+      id: tempId,
+      title: "Cuộc trò chuyện mới",
+      is_pinned: false,
+      created_at: new Date().toISOString(),
+    };
+
+    setRecentChats((prev) => [tempSession, ...prev]);
+    setActiveChatId(tempId);
 
     setMessages(
       starterMessages.map((msg) => {
@@ -261,10 +277,82 @@ export default function HomePage() {
         return msg;
       })
     );
+
+    const creationPromise = (async () => {
+      try {
+        const response = await fetchWithAuth("/auth-api/chat/sessions", {
+          method: "POST",
+          body: JSON.stringify({ title: "Cuộc trò chuyện mới" }),
+        });
+        if (response.ok) {
+          const newSession = await response.json();
+          setRecentChats((prev) =>
+            prev.map((chat) => (chat.id === tempId ? newSession : chat))
+          );
+          setActiveChatId((currentId) => (currentId === tempId ? newSession.id : currentId));
+          return newSession.id;
+        }
+        throw new Error("Không thể tạo cuộc trò chuyện trên server");
+      } catch (err) {
+        console.error("Failed to create session in background:", err);
+        setRecentChats((prev) => prev.filter((chat) => chat.id !== tempId));
+        setApiError("Không thể kết nối máy chủ để tạo cuộc trò chuyện");
+        throw err;
+      }
+    })();
+
+    pendingCreationPromiseRef.current = { tempId, promise: creationPromise };
   };
 
   const handleSelectChat = (chatId) => {
     setActiveChatId(chatId);
+  };
+
+  const handleDeleteChat = async (chatId) => {
+    const previousChats = [...recentChats];
+    const previousActiveId = activeChatId;
+
+    const updated = recentChats.filter((chat) => chat.id !== chatId);
+    setRecentChats(updated);
+    if (activeChatId === chatId) {
+      if (updated.length > 0) {
+        setActiveChatId(updated[0].id);
+      } else {
+        void handleNewChat();
+      }
+    }
+
+    try {
+      await deleteChatSession(chatId);
+    } catch (err) {
+      console.error("Failed to delete chat session:", err);
+      setApiError(err?.message || "Không thể xóa cuộc trò chuyện");
+      setRecentChats(previousChats);
+      setActiveChatId(previousActiveId);
+    }
+  };
+
+  const handleTogglePinChat = async (chatId, isPinned) => {
+    const previousChats = [...recentChats];
+
+    setRecentChats((prev) => {
+      const updated = prev.map((chat) =>
+        chat.id === chatId ? { ...chat, is_pinned: isPinned } : chat
+      );
+      return updated.sort((a, b) => {
+        if (a.is_pinned && !b.is_pinned) return -1;
+        if (!a.is_pinned && b.is_pinned) return 1;
+        return new Date(b.created_at) - new Date(a.created_at);
+      });
+    });
+
+    try {
+      await pinChatSession(chatId, isPinned);
+    } catch (err) {
+      console.error("Failed to toggle pin state:", err);
+      setApiError(err?.message || "Không thể thay đổi trạng thái ghim");
+      setRecentChats(previousChats);
+    }
   };
 
   const handleToggleSidebar = () => {
@@ -598,6 +686,21 @@ export default function HomePage() {
 
     activeAbortControllerRef.current = new AbortController();
 
+    // Await session creation if it's currently temporary
+    let currentChatId = activeChatId;
+    if (currentChatId && currentChatId.startsWith("temp-")) {
+      if (pendingCreationPromiseRef.current && pendingCreationPromiseRef.current.tempId === currentChatId) {
+        try {
+          currentChatId = await pendingCreationPromiseRef.current.promise;
+        } catch (err) {
+          setApiError("Không thể tự động tạo cuộc trò chuyện mới");
+          setIsThinking(false);
+          sendLockRef.current = false;
+          return;
+        }
+      }
+    }
+
     try {
       let result;
       if (pendingImagesForMessage?.length) {
@@ -606,7 +709,7 @@ export default function HomePage() {
         try {
           const form = new FormData();
           form.append('file', firstFile);
-          if (activeChatId) form.append('session_id', activeChatId);
+          if (currentChatId) form.append('session_id', currentChatId);
 
           await fetchWithAuth('/auth-api/files/upload', {
             method: 'POST',
@@ -624,7 +727,7 @@ export default function HomePage() {
           language: "vi",
           patientId: null,
           topK: 5,
-          sessionId: activeChatId,
+          sessionId: currentChatId,
           signal: activeAbortControllerRef.current?.signal,
         });
       } else {
@@ -652,7 +755,7 @@ export default function HomePage() {
           query: userText || "Phân tích ảnh đã tải lên",
           topK: 5,
           includeDebug: false,
-          sessionId: activeChatId,
+          sessionId: currentChatId,
           signal: activeAbortControllerRef.current?.signal,
           onToken: (token) => {
             streamedAnswer += token;
@@ -812,6 +915,8 @@ export default function HomePage() {
             activeChatId={activeChatId}
             onNewChat={handleNewChat}
             onSelectChat={handleSelectChat}
+            onDeleteChat={handleDeleteChat}
+            onTogglePinChat={handleTogglePinChat}
             collapsed={isSidebarCollapsed}
             onToggleCollapsed={handleToggleSidebar}
             isDark={isDark}

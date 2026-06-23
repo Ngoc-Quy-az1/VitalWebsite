@@ -373,3 +373,80 @@ export async function analyzeAndAnswerHealthReportImage({
   return response.json();
 }
 
+export async function deleteChatSession(sessionId) {
+  const response = await fetchWithAuth(`/auth-api/chat/sessions/${sessionId}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    let detail = `HTTP ${response.status}`;
+    try {
+      const data = await response.json();
+      detail = data?.detail || detail;
+    } catch {
+      // fallback
+    }
+    throw new Error(detail);
+  }
+  return response.json();
+}
+
+export async function pinChatSession(sessionId, isPinned) {
+  const response = await fetchWithAuth(`/auth-api/chat/sessions/${sessionId}/pin`, {
+    method: "PUT",
+    body: JSON.stringify({ isPinned }),
+  });
+  if (!response.ok) {
+    let detail = `HTTP ${response.status}`;
+    try {
+      const data = await response.json();
+      detail = data?.detail || detail;
+    } catch {
+      // fallback
+    }
+    throw new Error(detail);
+  }
+  return response.json();
+}
+
+export async function getAdminStats() {
+  const response = await fetchWithAuth("/auth-api/admin/stats");
+  if (!response.ok) {
+    throw new Error(`Failed to fetch stats: HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function getAdminUsers() {
+  const response = await fetchWithAuth("/auth-api/admin/users");
+  if (!response.ok) {
+    throw new Error(`Failed to fetch users: HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function getAdminSessions() {
+  const response = await fetchWithAuth("/auth-api/admin/sessions");
+  if (!response.ok) {
+    throw new Error(`Failed to fetch all sessions: HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function getAdminUserSessions(userId) {
+  const response = await fetchWithAuth(`/auth-api/admin/users/${userId}/sessions`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch user sessions: HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function getAdminSessionMessages(sessionId) {
+  const response = await fetchWithAuth(`/auth-api/admin/sessions/${sessionId}/messages`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch session messages: HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
+
+

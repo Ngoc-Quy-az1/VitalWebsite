@@ -126,13 +126,6 @@ function MenuPanel({
           className={compactItemClass}
           onClick={handleItemClick("profile")}
         />
-        <DropdownMenuItem
-          role="menuitem"
-          icon={Settings2}
-          label={t.settings}
-          className={compactItemClass}
-          onClick={handleItemClick("settings")}
-        />
       </div>
 
       <div className="px-2 py-1.5" role="none">

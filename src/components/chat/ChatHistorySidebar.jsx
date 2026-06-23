@@ -3,6 +3,9 @@ import {
   PanelLeft,
   Plus,
   Sparkles,
+  Pin,
+  PinOff,
+  Trash2,
 } from "lucide-react";
 import UserProfileSection from "../profile/UserProfileSection";
 import { useLanguage } from "../../contexts/LanguageContext";
@@ -17,6 +20,8 @@ export default function ChatHistorySidebar({
   activeChatId,
   onNewChat,
   onSelectChat,
+  onDeleteChat,
+  onTogglePinChat,
   collapsed = false,
   onToggleCollapsed,
   isDark = false,
@@ -27,7 +32,7 @@ export default function ChatHistorySidebar({
   customPlan,
   onUpgradeSuccess,
 }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const railButtonClass =
     "flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200";
 
@@ -35,6 +40,8 @@ export default function ChatHistorySidebar({
   const visibleRecentChats = recentChats.filter(
     (chat) => chat?.title?.trim() !== "Cuộc trò chuyện mới"
   );
+  const pinnedChats = visibleRecentChats.filter((chat) => chat?.is_pinned);
+  const unpinnedChats = visibleRecentChats.filter((chat) => !chat?.is_pinned);
 
   return (
     <aside
@@ -128,29 +135,119 @@ export default function ChatHistorySidebar({
             })}
           </nav>
 
-          <div className="mt-6 flex min-h-0 flex-1 flex-col">
-            <p className="mb-2 shrink-0 px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              {t("recent")}
-            </p>
-            <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto pr-1">
-              {visibleRecentChats.map((chat) => {
-                const isActive = chat.id === activeChatId;
-                return (
-                  <button
-                    key={chat.id}
-                    type="button"
-                    onClick={() => onSelectChat?.(chat.id)}
-                    className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-all duration-200 truncate ${
-                      isActive
-                        ? "bg-slate-150 text-slate-900 font-semibold dark:bg-slate-800 dark:text-slate-100"
-                        : "text-slate-700 hover:bg-slate-100/70 dark:text-slate-300 dark:hover:bg-slate-800/50"
-                    }`}
-                    title={chat.title}
-                  >
-                    <span className="block truncate">{chat.title}</span>
-                  </button>
-                );
-              })}
+          <div className="mt-6 flex min-h-0 flex-1 flex-col gap-4">
+            {pinnedChats.length > 0 && (
+              <div className="flex flex-col min-h-0 max-h-[45%] shrink-0">
+                <p className="mb-2 shrink-0 px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                  {language === "VI" ? "Đã ghim" : "Pinned"}
+                </p>
+                <div className="min-h-0 overflow-y-auto space-y-0.5 pr-1">
+                  {pinnedChats.map((chat) => {
+                    const isActive = chat.id === activeChatId;
+                    return (
+                      <div
+                        key={chat.id}
+                        className={`group relative flex items-center justify-between rounded-lg px-3 py-1.5 text-sm transition-all duration-200 ${
+                          isActive
+                            ? "bg-slate-150 text-slate-900 font-semibold dark:bg-slate-800 dark:text-slate-100"
+                            : "text-slate-700 hover:bg-slate-100/70 dark:text-slate-300 dark:hover:bg-slate-800/50"
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => onSelectChat?.(chat.id)}
+                          className="flex-1 text-left truncate pr-14"
+                          title={chat.title}
+                        >
+                          <span className="block truncate">{chat.title}</span>
+                        </button>
+                        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onTogglePinChat?.(chat.id, false);
+                            }}
+                            className="p-1 rounded text-slate-400 hover:text-teal-600 hover:bg-slate-200/50 dark:hover:bg-slate-700/50"
+                            title="Bỏ ghim"
+                          >
+                            <PinOff size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm("Bạn có chắc chắn muốn xóa cuộc hội thoại này?")) {
+                                onDeleteChat?.(chat.id);
+                              }
+                            }}
+                            className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-slate-200/50 dark:hover:bg-slate-700/50"
+                            title="Xóa"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col min-h-0 flex-1">
+              <p className="mb-2 shrink-0 px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                {t("recent")}
+              </p>
+              <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto pr-1">
+                {unpinnedChats.map((chat) => {
+                  const isActive = chat.id === activeChatId;
+                  return (
+                    <div
+                      key={chat.id}
+                      className={`group relative flex items-center justify-between rounded-lg px-3 py-1.5 text-sm transition-all duration-200 ${
+                        isActive
+                          ? "bg-slate-150 text-slate-900 font-semibold dark:bg-slate-800 dark:text-slate-100"
+                          : "text-slate-700 hover:bg-slate-100/70 dark:text-slate-300 dark:hover:bg-slate-800/50"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => onSelectChat?.(chat.id)}
+                        className="flex-1 text-left truncate pr-14"
+                        title={chat.title}
+                      >
+                        <span className="block truncate">{chat.title}</span>
+                      </button>
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onTogglePinChat?.(chat.id, true);
+                          }}
+                          className="p-1 rounded text-slate-400 hover:text-teal-600 hover:bg-slate-200/50 dark:hover:bg-slate-700/50"
+                          title="Ghim"
+                        >
+                          <Pin size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm("Bạn có chắc chắn muốn xóa cuộc hội thoại này?")) {
+                              onDeleteChat?.(chat.id);
+                            }
+                          }}
+                          className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-slate-200/50 dark:hover:bg-slate-700/50"
+                          title="Xóa"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
