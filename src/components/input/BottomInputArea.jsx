@@ -1,7 +1,8 @@
+import { useEffect, useRef } from "react";
 import {
   ArrowUp,
   AudioLines,
-  ChevronDown,
+  Keyboard,
   Mic,
   Plus,
   Square,
@@ -31,6 +32,15 @@ export default function BottomInputArea({
   onStopGeneration,
 }) {
   const { t } = useLanguage();
+  const textareaRef = useRef(null);
+
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }, [inputValue]);
+
   const voiceEnabled = interactionMode === "voice";
   const hasAttachment = Array.isArray(pendingImage) ? pendingImage.length > 0 : Boolean(pendingImage);
   const canSend = Boolean((inputValue?.trim()) || hasAttachment) && !isThinking;
@@ -71,9 +81,26 @@ export default function BottomInputArea({
         </div>
       )}
 
-      <article className="overflow-hidden rounded-3xl border border-teal-100 bg-white shadow-xl shadow-cyan-100/70 dark:border-slate-600 dark:bg-slate-900 dark:shadow-none">
+      <article className="flex items-end gap-1.5 rounded-[32px] bg-[#f0f4f9] px-3.5 py-2 shadow-none border-0 dark:bg-slate-800">
+        {/* Nút đính kèm Plus */}
+        <label
+          className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full text-[#444746] transition hover:bg-[#e0e4e9] dark:text-[#c4c7c5] dark:hover:bg-slate-700 mb-0.5"
+          title={t("attachImage")}
+        >
+          <Plus size={22} strokeWidth={2} />
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={onPickImage}
+          />
+        </label>
+
+        {/* Ô nhập liệu textarea tự động giãn nở gọn gàng */}
         <textarea
-          rows={3}
+          ref={textareaRef}
+          rows={1}
           value={inputValue}
           onChange={(event) => onInputChange(event.target.value)}
           onKeyDown={(event) => {
@@ -83,121 +110,76 @@ export default function BottomInputArea({
             }
           }}
           placeholder={t("inputPlaceholder")}
-          className="block w-full resize-none border-none bg-transparent px-5 pt-5 pb-2 text-base leading-relaxed text-slate-700 placeholder:text-slate-400 outline-none dark:text-slate-100 dark:placeholder:text-slate-500"
+          className="flex-1 resize-none border-none bg-transparent px-2 py-2 text-base leading-relaxed text-[#1f1f1f] placeholder-[#444746] outline-none dark:text-[#e3e3e3] dark:placeholder-[#c4c7c5] max-h-[140px] min-h-[24px] overflow-y-auto"
         />
 
-        <footer className="flex items-center justify-between gap-2 px-3 pb-3 pt-1">
-          <label
-            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-teal-600 transition hover:bg-teal-50 dark:text-teal-300 dark:hover:bg-slate-800"
-            title={t("attachImage")}
-          >
-            <Plus size={20} strokeWidth={2} />
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={onPickImage}
-            />
-          </label>
-
+        {/* Bộ nút chức năng bên phải */}
+        <div className="flex items-center gap-1 shrink-0 mb-0.5">
+          {/* Biểu tượng chuyển chế độ giọng nói / bàn phím tinh gọn */}
           <button
             type="button"
             onClick={() =>
               onInteractionModeChange?.(interactionMode === "voice" ? "chat" : "voice")
             }
-            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm font-medium text-teal-700 transition hover:bg-teal-50 dark:text-teal-300 dark:hover:bg-slate-800"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-[#444746] transition hover:bg-[#e0e4e9] dark:text-[#c4c7c5] dark:hover:bg-slate-700"
+            title={interactionMode === "voice" ? t("chatMode") : t("voiceMode")}
           >
-            {interactionMode === "voice" ? t("voiceMode") : t("chatMode")}
-            <ChevronDown size={14} className="opacity-60" />
+            {interactionMode === "voice" ? <Keyboard size={20} /> : <Mic size={20} />}
           </button>
 
-          <span className="flex-1" />
-
-          <button
-            type="button"
-            onClick={handleVoiceClick}
-            title={
-              isListening
-                ? t("stopRecording")
-                : voiceEnabled
-                  ? t("clickToTalk")
-                  : t("voiceModeToggle")
-            }
-            className={`relative flex h-11 shrink-0 items-center justify-center gap-2 overflow-hidden rounded-xl px-3.5 text-sm font-semibold shadow-md transition ${
-              isListening
-                ? "bg-rose-500 text-white ring-4 ring-rose-200/80 dark:ring-rose-900/60"
-                : voiceEnabled
-                  ? "voice-btn-active bg-gradient-to-r from-teal-500 to-cyan-500 text-white ring-4 ring-teal-200/90 hover:from-teal-600 hover:to-cyan-600 dark:ring-teal-800/80"
-                  : "border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100 dark:border-teal-700 dark:bg-teal-950 dark:text-teal-200"
-            }`}
-          >
-            {isListening ? (
-              <>
-                <Square size={18} className="relative z-10 shrink-0 fill-white" />
-                <span className="relative z-10 hidden sm:inline">{t("listening")}</span>
-                <span className="absolute inset-0 flex items-center justify-center gap-1 px-10 opacity-40">
-                  {waveDelays.map((delay) => (
-                    <span
-                      key={delay}
-                      style={{ animationDelay: `${delay}ms` }}
-                      className="wave-bar h-6 w-1 rounded-full bg-white/80"
-                    />
-                  ))}
-                </span>
-              </>
-            ) : isSpeaking ? (
-              <>
-                <Square size={18} className="shrink-0 fill-current" />
-                <span className="hidden sm:inline">{t("stopSpeaking")}</span>
-              </>
-            ) : voiceEnabled ? (
-              <>
-                <span className="relative flex shrink-0 items-center">
-                  <Mic size={22} strokeWidth={2.5} />
-                  <AudioLines
-                    size={16}
-                    strokeWidth={2.5}
-                    className="absolute -right-2 -bottom-1 opacity-95"
-                    aria-hidden
-                  />
-                </span>
-                <span>{t("voiceVisualizerText")}</span>
-              </>
-            ) : (
-              <>
-                <Mic size={22} strokeWidth={2.5} className="shrink-0" />
-                <span className="hidden min-[400px]:inline">{t("voiceMode")}</span>
-              </>
-            )}
-          </button>
-
-          {isThinking ? (
+          {/* Hiển thị nút Thu âm / Dừng thu ở chế độ giọng nói */}
+          {voiceEnabled && (
             <button
               type="button"
-              onClick={onStopGeneration}
-              aria-label="Dừng tạo câu trả lời"
-              title="Dừng tạo câu trả lời"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-rose-500 text-white shadow-md hover:bg-rose-600 transition"
-            >
-              <Square size={16} className="fill-white" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => onSendMessage()}
-              disabled={!canSend}
-              aria-label={t("sendMessage")}
-              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition ${
-                canSend
-                  ? "bg-teal-600 text-white shadow-md hover:bg-teal-700"
-                  : "cursor-not-allowed bg-teal-100 text-teal-300 dark:bg-slate-700 dark:text-slate-500"
+              onClick={handleVoiceClick}
+              title={
+                isListening
+                  ? t("stopRecording")
+                  : t("clickToTalk")
+              }
+              className={`flex h-10 w-10 items-center justify-center rounded-full transition ${
+                isListening
+                  ? "bg-rose-500 text-white shadow-md animate-pulse"
+                  : "text-[#444746] hover:bg-[#e0e4e9] dark:text-[#c4c7c5] dark:hover:bg-slate-700"
               }`}
             >
-              <ArrowUp size={20} strokeWidth={2.5} />
+              {isListening ? (
+                <Square size={14} className="fill-white" />
+              ) : (
+                <Mic size={20} />
+              )}
             </button>
           )}
-        </footer>
+
+          {/* Nút gửi tin nhắn hoặc dừng tạo câu trả lời (chỉ ở chế độ chat chữ hoặc khi AI đang suy nghĩ) */}
+          {(!voiceEnabled || isThinking) && (
+            isThinking ? (
+              <button
+                type="button"
+                onClick={onStopGeneration}
+                aria-label="Dừng tạo câu trả lời"
+                title="Dừng tạo câu trả lời"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-rose-500 text-white shadow-md hover:bg-rose-600 transition"
+              >
+                <Square size={14} className="fill-white" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onSendMessage()}
+                disabled={!canSend}
+                aria-label={t("sendMessage")}
+                className={`flex h-10 w-10 items-center justify-center rounded-full transition ${
+                  canSend
+                    ? "bg-teal-600 text-white shadow-md hover:bg-teal-700"
+                    : "cursor-not-allowed text-[#444746]/40 dark:text-[#c4c7c5]/30"
+                }`}
+              >
+                <ArrowUp size={20} strokeWidth={2.5} />
+              </button>
+            )
+          )}
+        </div>
       </article>
 
       <QuickReplies

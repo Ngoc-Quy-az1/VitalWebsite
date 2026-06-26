@@ -262,3 +262,19 @@
   font-size: 1.2em;
   line-height: 1.35;
 }
+
+/* High contrast and legible typography for outdoor readability */
+.prose p, .prose li {
+  color: #1e293b !important;
+  font-weight: 500;
+}
+html.dark .prose p, html.dark .prose li {
+  color: #f1f5f9 !important;
+}
+
+/* Horizontal scroll fade out mask */
+.mask-gradient {
+  mask-image: linear-gradient(to right, rgba(0,0,0,1) 90%, rgba(0,0,0,0) 100%);
+  -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,1) 90%, rgba(0,0,0,0) 100%);
+}
+

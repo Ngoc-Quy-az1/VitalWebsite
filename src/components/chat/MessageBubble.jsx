@@ -2,7 +2,6 @@ import { motion } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "../../utils/cn";
-import { Stethoscope, User } from "lucide-react";
 
 export default function MessageBubble({ message }) {
   const isUser = message.role === "user";
@@ -12,33 +11,21 @@ export default function MessageBubble({ message }) {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       className={cn(
-        "flex w-full px-4 md:px-0",
+        "flex w-full px-1 md:px-0",
         isUser ? "justify-end" : "justify-start"
       )}
     >
       <div
         className={cn(
-          "flex gap-4 max-w-[85%] md:max-w-[75%]",
-          isUser ? "flex-row-reverse" : "flex-row"
+          "w-full flex",
+          isUser ? "justify-end" : "justify-start"
         )}
       >
-        {/* Avatar */}
         <div
           className={cn(
-            "w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-sm",
-            isUser ? "bg-slate-100" : "bg-teal-600 text-white"
-          )}
-        >
-          {isUser ? <User size={18} className="text-slate-600" /> : <Stethoscope size={18} />}
-        </div>
-
-        {/* Content */}
-        <div
-          className={cn(
-            "px-5 py-3.5 rounded-2xl shadow-sm leading-relaxed border",
             isUser
-              ? "bg-slate-100 border-transparent text-slate-800 rounded-tr-none dark:bg-teal-950/60 dark:border-teal-800/30 dark:text-slate-100"
-              : "bg-white border-teal-50 text-slate-800 rounded-tl-none dark:bg-slate-800 dark:border-slate-700/80 dark:text-slate-200"
+              ? "px-5 py-3 rounded-[24px] bg-[#f0f4f9] text-[#1f1f1f] max-w-[85%] md:max-w-[70%] shadow-none border-0 dark:bg-slate-800 dark:text-[#e3e3e3]"
+              : "w-full text-left bg-transparent border-0 shadow-none p-0 text-[#1f1f1f] dark:text-[#e3e3e3] py-2"
           )}
         >
           {Array.isArray(message.imagePreviews) && message.imagePreviews.length > 0 ? (
@@ -53,7 +40,10 @@ export default function MessageBubble({ message }) {
             </div>
           ) : null}
 
-          <div className="prose prose-sm md:prose-base prose-slate dark:prose-invert max-w-none">
+          <div className={cn(
+            "prose prose-slate dark:prose-invert max-w-none break-words",
+            isUser ? "[&_*]:text-[#1f1f1f] dark:[&_*]:text-[#e3e3e3] font-normal" : "text-[#1f1f1f] dark:text-[#e3e3e3]"
+          )}>
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {message.content}
             </ReactMarkdown>

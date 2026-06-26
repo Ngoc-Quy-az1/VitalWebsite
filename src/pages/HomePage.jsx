@@ -86,7 +86,12 @@ export default function HomePage() {
   const [isThinking, setIsThinking] = useState(false);
   const [apiError, setApiError] = useState("");
   const [showMobileAvatar, setShowMobileAvatar] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const { isDark, toggleTheme, setIsDark } = useTheme();
+  
+  const ttsQueueRef = useRef([]);
+  const isTtsSpeakingRef = useRef(false);
+  const ttsSentenceBufferRef = useRef("");
   const recognitionRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const recordedChunksRef = useRef([]);
@@ -567,7 +572,152 @@ export default function HomePage() {
     }
   };
 
+  const cleanMarkdownForTts = (text) => {
+    return text
+      .replace(/[*#`_\-]/g, "")
+      .replace(/\[.*?\]\(.*?\)/g, "")
+      .replace(/\n+/g, " ")
+      .trim();
+  };
+
+  const playTtsQueue = () => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    if (isTtsSpeakingRef.current) return;
+
+    if (ttsQueueRef.current.length === 0) {
+      return;
+    }
+
+    const nextSentence = ttsQueueRef.current.shift();
+    const cleaned = cleanMarkdownForTts(nextSentence);
+    if (!cleaned) {
+      playTtsQueue();
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(cleaned);
+    const voices = window.speechSynthesis.getVoices();
+    const bestVoice = pickBestVietnameseVoice(voices);
+    if (bestVoice) {
+      utterance.voice = bestVoice;
+      utterance.lang = bestVoice.lang || "vi-VN";
+    } else {
+      utterance.lang = "vi-VN";
+    }
+    utterance.rate = 0.98;
+    utterance.pitch = 1.02;
+    utterance.volume = 1.0;
+
+    utterance.onstart = () => {
+      isTtsSpeakingRef.current = true;
+      setIsSpeaking(true);
+    };
+    utterance.onend = () => {
+      isTtsSpeakingRef.current = false;
+      setIsSpeaking(false);
+      playTtsQueue();
+    };
+    utterance.onerror = () => {
+      isTtsSpeakingRef.current = false;
+      setIsSpeaking(false);
+      playTtsQueue();
+    };
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const speakTextInstantly = (text) => {
+    if (typeof window === "undefined" || !window.speechSynthesis || !text) return;
+    try {
+      const cleaned = cleanMarkdownForTts(text);
+      const utterance = new SpeechSynthesisUtterance(cleaned);
+      const voices = window.speechSynthesis.getVoices();
+      const bestVoice = pickBestVietnameseVoice(voices);
+      if (bestVoice) {
+        utterance.voice = bestVoice;
+        utterance.lang = bestVoice.lang || "vi-VN";
+      } else {
+        utterance.lang = "vi-VN";
+      }
+      utterance.rate = 0.98;
+      utterance.pitch = 1.02;
+      utterance.volume = 1.0;
+
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+    } catch (err) {
+      console.error("Instant TTS failed:", err);
+      setIsSpeaking(false);
+    }
+  };
+
+  const processTtsBuffer = (isFinal = false) => {
+    let buffer = ttsSentenceBufferRef.current;
+    if (!buffer) return;
+
+    // Safety regex to ignore decimals and abbreviations
+    const sentenceBoundaryRegex = /(?<!\d)\.(?!\d)|[?!]|\n+/;
+
+    while (true) {
+      const match = buffer.match(sentenceBoundaryRegex);
+      if (!match) {
+        break;
+      }
+
+      const index = match.index;
+      const delimiter = match[0];
+      const chunk = buffer.substring(0, index + delimiter.length);
+      
+      const isListItem = /^\s*[-*•]\s|^\s*\d+\.\s/.test(chunk.trim());
+      
+      if (isListItem) {
+        const matches = buffer.match(/^\s*[-*•]\s|^\s*\d+\.\s/gm) || [];
+        // Group list items (wait for 3 lines/bullet points unless it's final flush)
+        if (matches.length < 3 && !isFinal) {
+          break;
+        }
+      } else {
+        // Min-length threshold: wait if sentence is shorter than 45 chars
+        if (chunk.length < 45 && !isFinal) {
+          const remainingBuffer = buffer.substring(index + delimiter.length);
+          const nextMatch = remainingBuffer.match(sentenceBoundaryRegex);
+          if (!nextMatch) {
+            break;
+          }
+          const nextIndex = nextMatch.index;
+          const nextDelimiter = nextMatch[0];
+          const combinedChunk = chunk + remainingBuffer.substring(0, nextIndex + nextDelimiter.length);
+          buffer = buffer.substring(chunk.length + nextIndex + nextDelimiter.length);
+          ttsQueueRef.current.push(combinedChunk);
+          playTtsQueue();
+          continue;
+        }
+      }
+
+      buffer = buffer.substring(chunk.length);
+      if (chunk.trim().length > 0) {
+        ttsQueueRef.current.push(chunk);
+        playTtsQueue();
+      }
+    }
+
+    ttsSentenceBufferRef.current = buffer;
+
+    if (isFinal && buffer.trim().length > 0) {
+      ttsQueueRef.current.push(buffer);
+      ttsSentenceBufferRef.current = "";
+      playTtsQueue();
+    }
+  };
+
   const handleStopSpeaking = () => {
+    ttsQueueRef.current = [];
+    ttsSentenceBufferRef.current = "";
+    isTtsSpeakingRef.current = false;
     setIsSpeaking(false);
     if (typeof window !== "undefined" && window.speechSynthesis) {
       window.speechSynthesis.cancel();
@@ -701,6 +851,14 @@ export default function HomePage() {
       }
     }
 
+    // Reset TTS state before sending new query
+    ttsQueueRef.current = [];
+    ttsSentenceBufferRef.current = "";
+    isTtsSpeakingRef.current = false;
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+
     try {
       let result;
       if (pendingImagesForMessage?.length) {
@@ -717,7 +875,7 @@ export default function HomePage() {
             signal: activeAbortControllerRef.current?.signal,
           });
         } catch (uploadErr) {
-          console.error('Image history save error:', uploadErr);
+          console.error("Image upload failed:", uploadErr);
         }
 
         // Call analysis tool
@@ -764,11 +922,20 @@ export default function HomePage() {
               setIsThinking(false);
             }
             upsertAssistantMessage(token);
+
+            if (interactionMode === "voice") {
+              ttsSentenceBufferRef.current += token;
+              processTtsBuffer(false);
+            }
           },
           onDone: (payload) => {
             const finalAnswer = payload?.answer || streamedAnswer || "Mình chưa tạo được câu trả lời từ hệ thống.";
             upsertAssistantMessage(finalAnswer, true);
             refreshSessionsList();
+
+            if (interactionMode === "voice") {
+              processTtsBuffer(true);
+            }
           },
         });
       }
@@ -780,30 +947,9 @@ export default function HomePage() {
           content: result?.answer || "Mình chưa tạo được câu trả lời từ hệ thống.",
         });
         refreshSessionsList();
-      }
-      const spoken = result?.answer || "";
-      if (interactionMode === "voice" && spoken && typeof window !== "undefined" && window.speechSynthesis) {
-        try {
-          const prepared = await prepareTtsText({ text: spoken });
-          const utterance = new SpeechSynthesisUtterance(prepared?.speak_text || spoken);
-          const voices = window.speechSynthesis.getVoices();
-          const bestVoice = pickBestVietnameseVoice(voices);
-          if (bestVoice) {
-            utterance.voice = bestVoice;
-            utterance.lang = bestVoice.lang || "vi-VN";
-          } else {
-            utterance.lang = "vi-VN";
-          }
-          utterance.rate = 0.97;
-          utterance.pitch = 1.03;
-          utterance.volume = 1.0;
-          utterance.onstart = () => setIsSpeaking(true);
-          utterance.onend = () => setIsSpeaking(false);
-          utterance.onerror = () => setIsSpeaking(false);
-          window.speechSynthesis.cancel();
-          window.speechSynthesis.speak(utterance);
-        } catch {
-          setIsSpeaking(false);
+
+        if (interactionMode === "voice" && result?.answer) {
+          speakTextInstantly(result.answer);
         }
       }
     } catch (error) {
@@ -903,18 +1049,28 @@ export default function HomePage() {
   ];
 
   return (
-    <section className="flex h-screen w-full flex-col p-2 sm:p-0">
+    <section className="flex h-screen w-full flex-col p-2 sm:p-0 overflow-hidden">
 
       <section
-        className="home-chat-grid relative min-h-0 flex-1 gap-2 sm:gap-0"
-        style={{ "--sidebar-width": isSidebarCollapsed ? "60px" : "320px" }}
+        className="home-chat-grid relative min-h-0 flex-1 gap-2 sm:gap-0 w-full overflow-hidden"
+        style={{ "--sidebar-width": isSidebarCollapsed ? "60px" : "280px" }}
       >
-        <div className="order-1 flex h-full min-h-0 flex-col overflow-visible xl:col-start-1 xl:row-start-1 xl:order-none">
+        {/* Sidebar Container: Sliding Drawer on Mobile, Static Side Panel on Desktop */}
+        <div className={`
+          fixed inset-y-0 left-0 z-50 flex h-full min-h-0 flex-col transition-transform duration-300 xl:static xl:translate-x-0 xl:z-0 xl:order-none
+          ${isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full xl:translate-x-0"}
+        `}>
           <ChatHistorySidebar
             recentChats={recentChats}
             activeChatId={activeChatId}
-            onNewChat={handleNewChat}
-            onSelectChat={handleSelectChat}
+            onNewChat={() => {
+              handleNewChat();
+              setIsMobileSidebarOpen(false);
+            }}
+            onSelectChat={(id) => {
+              handleSelectChat(id);
+              setIsMobileSidebarOpen(false);
+            }}
             onDeleteChat={handleDeleteChat}
             onTogglePinChat={handleTogglePinChat}
             collapsed={isSidebarCollapsed}
@@ -922,13 +1078,24 @@ export default function HomePage() {
             isDark={isDark}
             onToggleTheme={toggleTheme}
             onSetDark={setIsDark}
-            onNavigateUpgrade={() => setActiveView("upgrade")}
+            onNavigateUpgrade={() => {
+              setActiveView("upgrade");
+              setIsMobileSidebarOpen(false);
+            }}
           />
         </div>
 
+        {/* Mobile Sidebar Backdrop Overlay */}
+        {isMobileSidebarOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm xl:hidden"
+            onClick={() => setIsMobileSidebarOpen(false)}
+          />
+        )}
+
         <div 
           data-tour="chat-window" 
-          className="order-3 flex h-full min-h-0 flex-col rounded-3xl border border-teal-100 bg-white/80 p-4 shadow-lg shadow-cyan-100/60 backdrop-blur sm:rounded-none sm:border-x-0 sm:border-y-0 sm:shadow-none md:p-5 xl:col-start-2 xl:row-start-1 xl:order-none dark:border-slate-700 dark:bg-slate-900/80"
+          className="order-3 flex h-full min-h-0 flex-col rounded-3xl border border-teal-100 bg-white/80 p-4 shadow-lg shadow-cyan-100/60 backdrop-blur sm:rounded-none sm:border-x-0 sm:border-y-0 sm:shadow-none md:p-5 xl:col-start-2 xl:row-start-1 xl:order-none dark:border-slate-700 dark:bg-slate-900/80 w-full min-w-0 overflow-hidden"
         >
           {activeView === "upgrade" ? (
             <UpgradePage
@@ -938,7 +1105,13 @@ export default function HomePage() {
             />
           ) : (
             <>
-              <ChatWindow messages={messages} isThinking={isThinking} />
+              <ChatWindow
+                messages={messages}
+                isThinking={isThinking}
+                onMenuClick={() => setIsMobileSidebarOpen(true)}
+                onToggleAvatar={() => setShowMobileAvatar(!showMobileAvatar)}
+                showMobileAvatar={showMobileAvatar}
+              />
 
               {apiError ? (
                 <p className="mx-1 mb-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
@@ -972,7 +1145,11 @@ export default function HomePage() {
 
         <section
           data-tour="avatar"
-          className={`order-2 relative hidden min-h-0 h-full 2xl:col-start-3 2xl:row-start-1 2xl:order-none 2xl:flex 2xl:flex-col ${showMobileAvatar ? "fixed inset-x-3 top-[5.5rem] z-40 block h-[38vh] 2xl:static 2xl:h-full" : ""}`}
+          className={`order-2 relative hidden min-h-0 h-full 2xl:col-start-3 2xl:row-start-1 2xl:order-none 2xl:flex 2xl:flex-col ${
+            showMobileAvatar
+              ? "fixed inset-x-4 top-24 z-40 !flex h-[40vh] max-h-[350px] flex-col rounded-3xl border border-teal-100 bg-white/95 p-4 shadow-2xl backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/95 2xl:static 2xl:h-full 2xl:max-h-none 2xl:p-0 2xl:border-0 2xl:shadow-none 2xl:bg-transparent"
+              : ""
+          }`}
         >
           <VirtualAvatarPanel
             isListening={isListening}

@@ -49,7 +49,7 @@ export default function ChatHistorySidebar({
       className={`flex h-full min-h-0 flex-col border border-slate-200/80 bg-white/80 shadow-lg shadow-slate-200/50 backdrop-blur transition-all duration-300 dark:border-slate-700 dark:bg-slate-900/80 dark:shadow-black/20 sm:rounded-none sm:border-y-0 sm:shadow-none ${
         collapsed
           ? "w-[60px] overflow-visible p-2.5 sm:border-l-0"
-          : "w-[320px] overflow-visible p-4 sm:border-l-0"
+          : "w-[280px] overflow-visible p-4 sm:border-l-0"
       }`}
     >
       {collapsed ? (
@@ -98,8 +98,8 @@ export default function ChatHistorySidebar({
         <div className="flex h-full min-h-0 flex-col">
           <div className="mb-4 flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 pb-3 dark:border-slate-800/60">
             <div>
-              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                <span className="bg-gradient-to-r from-teal-600 to-cyan-500 bg-clip-text text-transparent">
+              <h2 className="text-2xl font-extrabold tracking-wider font-sans select-none">
+                <span className="bg-gradient-to-r from-teal-600 to-cyan-500 bg-clip-text text-transparent drop-shadow-sm">
                   {t("sidebarTitle")}
                 </span>
               </h2>
@@ -147,19 +147,21 @@ export default function ChatHistorySidebar({
                     return (
                       <div
                         key={chat.id}
-                        className={`group relative flex items-center justify-between rounded-lg px-3 py-1.5 text-sm transition-all duration-200 ${
+                        className={`group relative flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-all duration-200 ${
                           isActive
-                            ? "bg-slate-150 text-slate-900 font-semibold dark:bg-slate-800 dark:text-slate-100"
-                            : "text-slate-700 hover:bg-slate-100/70 dark:text-slate-300 dark:hover:bg-slate-800/50"
+                            ? "bg-teal-50 dark:bg-slate-800 text-slate-900 font-bold dark:text-slate-100"
+                            : "text-slate-700 hover:bg-slate-100/70 dark:text-slate-350 dark:hover:bg-slate-800/50"
                         }`}
                       >
                         <button
                           type="button"
                           onClick={() => onSelectChat?.(chat.id)}
-                          className="flex-1 text-left truncate pr-14"
+                          className="flex-1 min-w-0 text-left pr-8"
                           title={chat.title}
                         >
-                          <span className="block truncate">{chat.title}</span>
+                          <span className={`block truncate font-semibold text-slate-800 dark:text-slate-200 ${isActive ? "text-teal-700 dark:text-teal-400" : ""}`}>
+                            {chat.title}
+                          </span>
                         </button>
                         <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
@@ -204,19 +206,21 @@ export default function ChatHistorySidebar({
                   return (
                     <div
                       key={chat.id}
-                      className={`group relative flex items-center justify-between rounded-lg px-3 py-1.5 text-sm transition-all duration-200 ${
+                      className={`group relative flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-all duration-200 ${
                         isActive
-                          ? "bg-slate-150 text-slate-900 font-semibold dark:bg-slate-800 dark:text-slate-100"
-                          : "text-slate-700 hover:bg-slate-100/70 dark:text-slate-300 dark:hover:bg-slate-800/50"
+                          ? "bg-teal-50 dark:bg-slate-800 text-slate-900 font-bold dark:text-slate-100"
+                          : "text-slate-700 hover:bg-slate-100/70 dark:text-slate-350 dark:hover:bg-slate-800/50"
                       }`}
                     >
                       <button
                         type="button"
                         onClick={() => onSelectChat?.(chat.id)}
-                        className="flex-1 text-left truncate pr-14"
+                        className="flex-1 min-w-0 text-left pr-8"
                         title={chat.title}
                       >
-                        <span className="block truncate">{chat.title}</span>
+                        <span className={`block truncate font-semibold text-slate-800 dark:text-slate-200 ${isActive ? "text-teal-700 dark:text-teal-400" : ""}`}>
+                          {chat.title}
+                        </span>
                       </button>
                       <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button

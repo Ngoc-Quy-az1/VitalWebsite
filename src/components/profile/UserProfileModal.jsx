@@ -80,12 +80,12 @@ export default function UserProfileModal({
           <div className="flex flex-col items-center gap-3 py-2">
             <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-tr from-teal-500 to-cyan-400 text-2xl font-bold text-white shadow-lg shadow-teal-500/20 dark:from-teal-600 dark:to-cyan-500">
               {userInitials}
-              <div className="absolute -bottom-1 -right-1 rounded-full border-2 border-white bg-emerald-500 p-1 text-white dark:border-slate-950">
+              <div className="absolute -bottom-1 -right-2 rounded-full border-2 border-white bg-emerald-500 p-1.5 text-white dark:border-slate-950 shadow-md">
                 <ShieldCheck size={14} />
               </div>
             </div>
-            <div className="text-center">
-              <span className="inline-block rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-700 dark:bg-teal-950/40 dark:text-teal-400">
+            <div className="text-center mt-3.5">
+              <span className="inline-block rounded-full bg-teal-50 px-3.5 py-1.5 text-xs font-semibold text-teal-700 dark:bg-teal-950/40 dark:text-teal-400">
                 {userPlan.includes("Pro") || userPlan.includes("Premium") ? t.proPlan : t.standardPlan}
               </span>
             </div>
@@ -101,7 +101,7 @@ export default function UserProfileModal({
               type="text"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2.5 text-sm text-slate-800 focus:border-teal-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-100 dark:focus:border-teal-500 dark:focus:bg-slate-900"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2.5 text-base text-slate-800 focus:border-teal-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-100 dark:focus:border-teal-500 dark:focus:bg-slate-900"
               required
             />
           </div>
@@ -116,7 +116,7 @@ export default function UserProfileModal({
               type="email"
               value={user?.email || "quydang16012004@gmail.com"}
               disabled
-              className="w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-100/70 px-3.5 py-2.5 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900/30 dark:text-slate-400"
+              className="w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-100/70 px-3.5 py-2.5 text-base text-slate-550 dark:border-slate-800 dark:bg-slate-900/30 dark:text-slate-400"
             />
           </div>
 
