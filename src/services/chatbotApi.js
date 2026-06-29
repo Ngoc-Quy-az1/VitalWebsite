@@ -143,6 +143,7 @@ export async function askChatbot({
 
 export async function streamChatbot({
   query,
+  originalQuery = null,
   topK = 5,
   includeDebug = false,
   diseaseName = null,
@@ -165,6 +166,7 @@ export async function streamChatbot({
       signal: signal || controller.signal,
       body: JSON.stringify({
         query,
+        original_query: originalQuery,
         top_k: topK,
         include_debug: includeDebug,
         disease_name: diseaseName,

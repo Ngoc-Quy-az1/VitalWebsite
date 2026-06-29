@@ -5,6 +5,9 @@ import { cn } from "../../utils/cn";
 
 export default function MessageBubble({ message }) {
   const isUser = message.role === "user";
+  const cleanContent = typeof message.content === "string"
+    ? message.content.replace(/\s*\(Ảnh đính kèm:[^)]+\)/gi, "")
+    : message.content;
 
   return (
     <motion.div
@@ -45,7 +48,7 @@ export default function MessageBubble({ message }) {
             isUser ? "[&_*]:text-[#1f1f1f] dark:[&_*]:text-[#e3e3e3] font-normal" : "text-[#1f1f1f] dark:text-[#e3e3e3]"
           )}>
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {message.content}
+              {cleanContent}
             </ReactMarkdown>
           </div>
         </div>

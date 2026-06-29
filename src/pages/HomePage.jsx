@@ -933,6 +933,7 @@ Quy tắc trả lời:
 
         await streamChatbot({
           query: ocrQuery,
+          originalQuery: userText || "Phân tích ảnh đã tải lên",
           topK: 5,
           includeDebug: false,
           sessionId: currentChatId,
