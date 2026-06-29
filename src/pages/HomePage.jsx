@@ -5,7 +5,7 @@ import ChatWindow from "../components/chat/ChatWindow";
 import BottomInputArea from "../components/input/BottomInputArea";
 import { QUICK_REPLIES } from "../constants/quickReplies";
 import { useTheme } from "../hooks/useTheme";
-import { analyzeAndAnswerHealthReportImage, prepareTtsText, streamChatbot, fetchWithAuth, voiceStt, deleteChatSession, pinChatSession } from "../services/chatbotApi";
+import { analyzeAndAnswerHealthReportImage, analyzeHealthReportImage, prepareTtsText, streamChatbot, fetchWithAuth, voiceStt, deleteChatSession, pinChatSession } from "../services/chatbotApi";
 import { useLanguage } from "../contexts/LanguageContext";
 import UpgradePage from "../components/profile/UpgradePage";
 import InteractiveTour from "../components/tour/InteractiveTour";
@@ -860,7 +860,6 @@ export default function HomePage() {
     }
 
     try {
-      let result;
       if (pendingImagesForMessage?.length) {
         // Asynchronously upload the image to the chat history first
         const firstFile = pendingImagesForMessage[0].file;
@@ -878,15 +877,88 @@ export default function HomePage() {
           console.error("Image upload failed:", uploadErr);
         }
 
-        // Call analysis tool
-        result = await analyzeAndAnswerHealthReportImage({
+        // Call OCR analysis tool first (Step 1)
+        setIsThinking(true);
+        const ocrResult = await analyzeHealthReportImage({
           file: firstFile,
-          question: userText || "Phân tích ảnh đã tải lên",
           language: "vi",
           patientId: null,
+        });
+
+        const ocrText = ocrResult?.ocr?.text || ocrResult?.text || "";
+        if (!ocrText.trim()) {
+          throw new Error("Không thể trích xuất chữ từ ảnh hoặc ảnh không có chữ.");
+        }
+
+        // Build prompt (Step 2)
+        const ocrQuery = `Bạn là bác sĩ trợ lý y khoa chuyên nghiệp và chu đáo. Người dùng đã gửi ảnh chụp phiếu kết quả khám sức khỏe, xét nghiệm hoặc kết quả lâm sàng.
+Dưới đây là toàn bộ nội dung văn bản y khoa trích xuất được từ ảnh (OCR):
+=========================================
+${ocrText}
+=========================================
+
+Yêu cầu của người dùng: ${userText || "Phân tích ảnh đã tải lên"}
+
+Nhiệm vụ của bạn:
+Hãy đọc hiểu văn bản y khoa trên cực kỳ kỹ lưỡng, nhận diện tất cả các chỉ số xét nghiệm, kết quả đo, khoảng tham chiếu và đơn vị có trong văn bản.
+Sau đó, hãy nhận xét chi tiết, chuyên nghiệp và chính xác về kết quả y tế này bằng tiếng Việt.
+
+Quy tắc trả lời:
+1) Trả lời rõ ràng, dễ hiểu, có cấu trúc tốt bằng tiếng Việt (sử dụng định dạng Markdown, bullet points).
+2) Nhận xét chi tiết từng chỉ số có dấu hiệu bất thường (nằm ngoài khoảng tham chiếu cao/thấp) và giải thích ý nghĩa lâm sàng đơn giản.
+3) Đưa ra mức độ ưu tiên theo dõi (thấp/vừa/cao) kèm lý do y khoa rõ ràng.
+4) Đưa ra các khuyến nghị hữu ích về chế độ dinh dưỡng, chế độ sinh hoạt hoặc các xét nghiệm/khám bổ sung tiếp theo nếu cần.
+5) Luôn kèm theo cảnh báo y khoa: 'Mọi thông tin phân tích từ văn bản ảnh chỉ mang tính chất tham khảo, không thay thế cho chẩn đoán và tư vấn chuyên môn của bác sĩ chuyên khoa.'`;
+
+        // Stream the answer
+        const assistantMessageId = `a-${Date.now()}`;
+        let hasStartedStreaming = false;
+        let streamedAnswer = "";
+        const upsertAssistantMessage = (content, replace = false) => {
+          setMessages((prev) => {
+            const exists = prev.some((message) => message.id === assistantMessageId);
+            if (!exists) {
+              return [...prev, { id: assistantMessageId, role: "assistant", content }];
+            }
+            return prev.map((message) => (
+              message.id === assistantMessageId
+                ? {
+                    ...message,
+                    content: replace ? content : `${message.content}${content}`,
+                  }
+                : message
+            ));
+          });
+        };
+
+        await streamChatbot({
+          query: ocrQuery,
           topK: 5,
+          includeDebug: false,
           sessionId: currentChatId,
           signal: activeAbortControllerRef.current?.signal,
+          onToken: (token) => {
+            streamedAnswer += token;
+            if (!hasStartedStreaming) {
+              hasStartedStreaming = true;
+              setIsThinking(false);
+            }
+            upsertAssistantMessage(token);
+
+            if (interactionMode === "voice") {
+              ttsSentenceBufferRef.current += token;
+              processTtsBuffer(false);
+            }
+          },
+          onDone: (payload) => {
+            const finalAnswer = payload?.answer || streamedAnswer || "Mình chưa tạo được câu trả lời từ hệ thống.";
+            upsertAssistantMessage(finalAnswer, true);
+            refreshSessionsList();
+
+            if (interactionMode === "voice") {
+              processTtsBuffer(true);
+            }
+          },
         });
       } else {
         const assistantMessageId = `a-${Date.now()}`;
@@ -909,7 +981,7 @@ export default function HomePage() {
           });
         };
 
-        result = await streamChatbot({
+        await streamChatbot({
           query: userText || "Phân tích ảnh đã tải lên",
           topK: 5,
           includeDebug: false,
@@ -938,19 +1010,6 @@ export default function HomePage() {
             }
           },
         });
-      }
-
-      if (pendingImagesForMessage?.length) {
-        addMessage({
-          id: `a-${Date.now()}`,
-          role: "assistant",
-          content: result?.answer || "Mình chưa tạo được câu trả lời từ hệ thống.",
-        });
-        refreshSessionsList();
-
-        if (interactionMode === "voice" && result?.answer) {
-          speakTextInstantly(result.answer);
-        }
       }
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
