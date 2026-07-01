@@ -183,6 +183,9 @@ export async function streamChatbot({
   } catch (error) {
     clearTimeout(timeoutId);
     if (error?.name === "AbortError") {
+      if (signal && signal.aborted) {
+        throw error;
+      }
       throw new Error("Yêu cầu quá thời gian chờ, vui lòng thử lại.");
     }
     throw error;
