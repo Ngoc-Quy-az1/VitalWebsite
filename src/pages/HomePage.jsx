@@ -313,6 +313,14 @@ export default function HomePage() {
     setActiveChatId(chatId);
   };
 
+  const handleTriggerWebSearch = async (queryText) => {
+    setMessages((prev) =>
+      prev.map((msg) => (msg.suggestWebSearch ? { ...msg, suggestWebSearch: false } : msg))
+    );
+    setInputValue(queryText);
+    await handleSendMessage(queryText, "manual", true);
+  };
+
   const handleDeleteChat = async (chatId) => {
     const previousChats = [...recentChats];
     const previousActiveId = activeChatId;
@@ -801,7 +809,7 @@ export default function HomePage() {
     });
   };
 
-  const handleSendMessage = async (overrideText = null, source = "manual") => {
+  const handleSendMessage = async (overrideText = null, source = "manual", forceWebSearch = false) => {
     const draftText = String(overrideText ?? inputValue ?? "").trim();
     if (!draftText && pendingImages.length === 0) return;
     if (sendLockRef.current) return;
@@ -914,17 +922,19 @@ Quy tắc trả lời:
         const assistantMessageId = `a-${Date.now()}`;
         let hasStartedStreaming = false;
         let streamedAnswer = "";
-        const upsertAssistantMessage = (content, replace = false) => {
+        const upsertAssistantMessage = (content, replace = false, sources = null, suggestWebSearch = false) => {
           setMessages((prev) => {
             const exists = prev.some((message) => message.id === assistantMessageId);
             if (!exists) {
-              return [...prev, { id: assistantMessageId, role: "assistant", content }];
+              return [...prev, { id: assistantMessageId, role: "assistant", content, sources, suggestWebSearch, query: userText }];
             }
             return prev.map((message) => (
               message.id === assistantMessageId
                 ? {
                     ...message,
                     content: replace ? content : `${message.content}${content}`,
+                    sources: sources || message.sources,
+                    suggestWebSearch: suggestWebSearch !== undefined ? suggestWebSearch : message.suggestWebSearch,
                   }
                 : message
             ));
@@ -937,6 +947,7 @@ Quy tắc trả lời:
           topK: 5,
           includeDebug: false,
           sessionId: currentChatId,
+          enableWebSearch: forceWebSearch ? true : undefined,
           signal: activeAbortControllerRef.current?.signal,
           onToken: (token) => {
             streamedAnswer += token;
@@ -953,7 +964,7 @@ Quy tắc trả lời:
           },
           onDone: (payload) => {
             const finalAnswer = payload?.answer || streamedAnswer || "Mình chưa tạo được câu trả lời từ hệ thống.";
-            upsertAssistantMessage(finalAnswer, true);
+            upsertAssistantMessage(finalAnswer, true, payload?.sources, payload?.suggest_web_search);
             refreshSessionsList();
 
             if (interactionMode === "voice") {
@@ -965,17 +976,19 @@ Quy tắc trả lời:
         const assistantMessageId = `a-${Date.now()}`;
         let hasStartedStreaming = false;
         let streamedAnswer = "";
-        const upsertAssistantMessage = (content, replace = false) => {
+        const upsertAssistantMessage = (content, replace = false, sources = null, suggestWebSearch = false) => {
           setMessages((prev) => {
             const exists = prev.some((message) => message.id === assistantMessageId);
             if (!exists) {
-              return [...prev, { id: assistantMessageId, role: "assistant", content }];
+              return [...prev, { id: assistantMessageId, role: "assistant", content, sources, suggestWebSearch, query: userText }];
             }
             return prev.map((message) => (
               message.id === assistantMessageId
                 ? {
                     ...message,
                     content: replace ? content : `${message.content}${content}`,
+                    sources: sources || message.sources,
+                    suggestWebSearch: suggestWebSearch !== undefined ? suggestWebSearch : message.suggestWebSearch,
                   }
                 : message
             ));
@@ -987,6 +1000,7 @@ Quy tắc trả lời:
           topK: 5,
           includeDebug: false,
           sessionId: currentChatId,
+          enableWebSearch: forceWebSearch ? true : undefined,
           signal: activeAbortControllerRef.current?.signal,
           onToken: (token) => {
             streamedAnswer += token;
@@ -1003,7 +1017,7 @@ Quy tắc trả lời:
           },
           onDone: (payload) => {
             const finalAnswer = payload?.answer || streamedAnswer || "Mình chưa tạo được câu trả lời từ hệ thống.";
-            upsertAssistantMessage(finalAnswer, true);
+            upsertAssistantMessage(finalAnswer, true, payload?.sources, payload?.suggest_web_search);
             refreshSessionsList();
 
             if (interactionMode === "voice") {
@@ -1171,6 +1185,7 @@ Quy tắc trả lời:
                 onMenuClick={() => setIsMobileSidebarOpen(true)}
                 onToggleAvatar={() => setShowMobileAvatar(!showMobileAvatar)}
                 showMobileAvatar={showMobileAvatar}
+                onTriggerWebSearch={handleTriggerWebSearch}
               />
 
               {apiError ? (

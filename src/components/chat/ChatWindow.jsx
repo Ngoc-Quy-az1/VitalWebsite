@@ -9,14 +9,20 @@ export default function ChatWindow({
   onMenuClick,
   onToggleAvatar,
   showMobileAvatar,
+  onTriggerWebSearch,
 }) {
   const listRef = useRef(null);
   const { t } = useLanguage();
 
+  const prevMessagesLengthRef = useRef(messages.length);
+
   useEffect(() => {
     const el = listRef.current;
     if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    const isNewMessage = messages.length !== prevMessagesLengthRef.current;
+    prevMessagesLengthRef.current = messages.length;
+    const behavior = isNewMessage ? "smooth" : "auto";
+    el.scrollTo({ top: el.scrollHeight, behavior });
   }, [messages, isThinking]);
 
   return (
@@ -59,7 +65,7 @@ export default function ChatWindow({
         className="min-h-0 flex-1 space-y-4 overflow-y-auto px-1 pb-2"
       >
         {messages.map((message) => (
-          <MessageBubble key={message.id} message={message} />
+          <MessageBubble key={message.id} message={message} onTriggerWebSearch={onTriggerWebSearch} />
         ))}
         {isThinking ? (
           <article className="flex items-end gap-2.5">

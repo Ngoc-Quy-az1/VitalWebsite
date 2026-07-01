@@ -86,6 +86,7 @@ export async function askChatbot({
   timeoutMs = 90000,
   maxRetries = 1,
   sessionId = null,
+  enableWebSearch = null,
 }) {
   let response = null;
   let attempt = 0;
@@ -106,6 +107,7 @@ export async function askChatbot({
           source_type: sourceType,
           biomarker,
           session_id: sessionId,
+          enable_web_search: enableWebSearch,
         }),
       });
       break;
@@ -155,6 +157,7 @@ export async function streamChatbot({
   timeoutMs = 90000,
   sessionId = null,
   signal = null,
+  enableWebSearch = null,
 }) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -174,6 +177,7 @@ export async function streamChatbot({
         source_type: sourceType,
         biomarker,
         session_id: sessionId,
+        enable_web_search: enableWebSearch,
       }),
     });
   } catch (error) {
